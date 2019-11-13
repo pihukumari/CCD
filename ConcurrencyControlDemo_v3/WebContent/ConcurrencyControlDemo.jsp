@@ -10,7 +10,7 @@
 
 	<b>Select the Concurrency Control Algorithm:</b>
 	<br />
-	<form action="Controller" method="post">
+	<form action="controller" method="post">
 	<select name="algorithm">
 		<option value="Two_Phase_Locking">Two-Phase Locking</option>
 		<option value="Timestamp_Ordering">Timestamp Ordering</option>

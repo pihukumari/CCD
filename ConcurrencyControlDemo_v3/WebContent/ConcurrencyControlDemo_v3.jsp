@@ -13,23 +13,20 @@ int counter;
 ArrayList<String> a = new ArrayList<String>();
 %>
 <%
-if (request.getAttribute("NumberOfTran") != null){
-	numberOfTran = Integer.parseInt(request.getAttribute("NumberOfTran").toString()); 
-}
-
 if (request.getAttribute("counter") != null) {
 	counter = Integer.parseInt(request.getAttribute("counter").toString());
 }
+
 %>
 
 	<b>Select the Concurrency Control Algorithm:</b>
 	<br />
 	<form action="controllerV2" method="post">
 		<select name="algorithm">
-			<option value="Two_Phase_Locking">Two-Phase Locking</option>
-			<option value="Timestamp_Ordering">Timestamp Ordering</option>
-			<option value="Optimistic_Concurrency_Control">Optimistic Concurrency Control</option>
-			<option value="Snapshot_Isolation">Snapshot Isolation</option>
+			<option value="Two-Phase Locking">Two-Phase Locking</option>
+			<option value="Timestamp Ordering">Timestamp Ordering</option>
+			<option value="Optimistic Concurrency Control">Optimistic Concurrency Control</option>
+			<option value="Snapshot Isolation">Snapshot Isolation</option>
 			<option value=<%=session.getAttribute("algo")%> selected disabled
 				style="color: rgb(255, 255, 255);"></option>
 		</select> &nbsp; 
@@ -52,9 +49,9 @@ if (request.getAttribute("counter") != null) {
 		
 	</form>
 		<% for (int i = 1; i <= counter; i++){ 
-			if (session.getAttribute("t" + Integer.toString(i)) != null) {%>
-				<%=session.getAttribute("t" + Integer.toString(i)) %><br />
-			<%}
+				if (session.getAttribute("t" + Integer.toString(i)) != null) { %>
+						<%=session.getAttribute("t" + Integer.toString(i)) %><br />
+				<%}
 			} %>
 
 	<br />

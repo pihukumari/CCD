@@ -11,8 +11,6 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
 import com.ccd.model.TwoPhaseLocking_V2;
-import com.ccd.model.SequenceGenerator;
-import com.ccd.model.SequenceGeneratorInterface;
 
 /**
  * Servlet implementation class ControllerServlet
@@ -24,15 +22,19 @@ public class ControllerServlet_V2 extends HttpServlet {
 	public HashMap<String, Long> sessonTranPair = new HashMap<String, Long>();
 	public static HashMap<String, Double> transTable = new HashMap<String, Double>();
 	public static HashMap<String, Long> lockTable = new HashMap<String, Long>();
-	HashMap<String, Double> tempTable = new HashMap<String, Double>();
+	public static HashMap<String, Double> rollbackTable = new HashMap<String, Double>();
+	public static HashMap<String, Double> tempTable = new HashMap<String, Double>();
+	public static ArrayList<Long> tranIDList = new ArrayList<Long>();
+	public static HashMap<Long, Boolean> unlockStart = new HashMap<Long, Boolean>();
 
-	SequenceGeneratorInterface sq = new SequenceGenerator();
+	public static Object lock = new Object();
+
 	long tranID;
-	private int callCounter;
+	private int nmbrOfCallsToServlet;
 
 	public void init() {
 		tranID = 1;
-		callCounter = 0;
+		nmbrOfCallsToServlet = 0;
 	}
 
 	/**
@@ -42,23 +44,63 @@ public class ControllerServlet_V2 extends HttpServlet {
 	protected void doPost(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
 
+		RequestDispatcher dispatcher = request.getRequestDispatcher("ConcurrencyControlDemo_v3.jsp");
 		session = request.getSession();
-
 		String result = null;
-		String commit = request.getParameter("commit");
-		if (commit != null) {
-			lockTable.clear();
-			tempTable.clear();
-			callCounter++;
-			result = "commited transaction #'" + Long.toString(sessonTranPair.get(session.getId())) + "'";
-			request.setAttribute("counter", callCounter);
-			session.setAttribute("t" + Integer.toString(callCounter), result);
-			sessonTranPair.put(session.getId(), tranID++);
-			session.setAttribute("tranID", sessonTranPair.get(session.getId()));
+
+		ArrayList<String> commit = new ArrayList<String>();
+		commit.add(0, request.getParameter("commit"));
+		if (commit.get(0) != null) {
+			commit.add(1, session.getId());
+				// Create a Iterator to KeySet of lock table
+				Iterator<String> keyset = lockTable.keySet().iterator();
+
+				// Iterate over all the lock table keys to remove locks for committed transaction
+				while (keyset.hasNext()) {
+					String key = keyset.next();
+					// Check if Value associated with Key is equal to tranID for this commit
+					if (lockTable.get(key) == sessonTranPair.get(commit.get(1))) {
+						lockTable.remove(key);
+					}
+				}
+				
+				// Create a Iterator to KeySet of temp table 
+				Iterator<String> tempKeyset = tempTable.keySet().iterator();
+
+				// Iterate over all the elements to find keys related to committed transaction
+				// modify the keys in order to retain the temp values for further operations after commit
+				while (tempKeyset.hasNext()) {
+					String key = tempKeyset.next();
+					// Check if Value associated with Key is equal to tranID for this commit
+					if (key.contains(Long.toString(sessonTranPair.get(commit.get(1))))) {
+						String newKey = key.replace(Long.toString(sessonTranPair.get(commit.get(1))), Long.toString(tranID));
+						tempTable.put(newKey, tempTable.get(key));
+						tempTable.remove(key);
+					}
+				}
+				result = "commited transaction #'" + Long.toString(sessonTranPair.get(commit.get(1))) + "'";
+				request.setAttribute("counter", nmbrOfCallsToServlet);
+				session.setAttribute("t" + Integer.toString(nmbrOfCallsToServlet), result);
+
+				nmbrOfCallsToServlet++;
+				tranIDList.add(tranID);
+				unlockStart.put(tranID, false);
+				sessonTranPair.replace(commit.get(1), tranID++);
+				session.setAttribute("tranID", sessonTranPair.get(commit.get(1)));
+				synchronized (lock) {
+				dispatcher.forward(request, response);
+				lock.notifyAll();
+			}
 		} else {
+
+			ArrayList<String> ts = new ArrayList<String>();
+			ts.add(0, request.getParameter("ts"));
+			ts.add(1, session.getId());
 			String algorithm = request.getParameter("algorithm");
-			String ts = (request.getParameter("ts"));
+
 			if (!sessonTranPair.containsKey(session.getId())) {
+				tranIDList.add(tranID);
+				unlockStart.put(tranID, false);
 				sessonTranPair.put(session.getId(), tranID++);
 			}
 
@@ -66,28 +108,34 @@ public class ControllerServlet_V2 extends HttpServlet {
 				session.setAttribute("algo", algorithm);
 				session.setAttribute("tranID", sessonTranPair.get(session.getId()));
 			}
-			// extract from session attribute
+			// extract algorithm name from session attribute "algo"
 			String algo = (String) session.getAttribute("algo");
 
-			if (ts != null) {
-				callCounter++;
-				result = concurrencyAlgorithm(ts, algo, sessonTranPair.get(session.getId()));
-				request.setAttribute("counter", callCounter);
-				session.setAttribute("t" + Integer.toString(callCounter), result);
+			if (ts.get(0) != null) {
+				nmbrOfCallsToServlet++;
+				try {
+					result = concurrencyAlgorithm(ts.get(0), algo, sessonTranPair.get(ts.get(1)));
+					session = request.getSession(); // has to be called again after the wait() to regain the state of
+													// the session of the waiting request.
+					session.setAttribute("t" + Integer.toString(nmbrOfCallsToServlet), result);
+					session.setAttribute("tranID", sessonTranPair.get(ts.get(1)));
+					request.setAttribute("counter", nmbrOfCallsToServlet);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
+			dispatcher.forward(request, response);
 		}
-		RequestDispatcher dispatcher = request.getRequestDispatcher("ConcurrencyControlDemo_v3.jsp");
-		dispatcher.forward(request, response);
 
 	}
 
-	public String concurrencyAlgorithm(String ts, String algorithm, long tranID) {
+	public String concurrencyAlgorithm(String ts, String algorithm, long tranID) throws InterruptedException {
 		ArrayList<String> result = null;
-		if (algorithm.contains("Two_Phase_Locking")) {
-			TwoPhaseLocking_V2 twoPL = new TwoPhaseLocking_V2(tempTable, tranID);
+		if (algorithm.contains("Two-Phase Locking")) {
+			TwoPhaseLocking_V2 twoPL = new TwoPhaseLocking_V2(tranID);
 			result = twoPL.transactionResult(ts);
 			if (result.size() > 1) {
-				tempTable.put(result.get(1), Double.parseDouble(result.get(2)));
+				tempTable.put(result.get(1) + Long.toString(tranID), Double.parseDouble(result.get(2)));
 			}
 		}
 		return result.get(0);
