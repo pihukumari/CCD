@@ -186,36 +186,51 @@ public class TransactionStmtTransformation {
 		// to perform calculations later
 		for (int i = 1; i < operands.length; i++) {
 			String operand = null;
+			int operandSize = operands[i].trim().length();
 			if (operands[i].trim().contains("(")) {
+				for (int j = 0; j < operandSize - 1; j++) {
+					equation.add("(");
+				}
 				operand = operands[i].trim().replace("(", "");
-				equation.add("(");
 				expressionHelper(operand, equation, transTable);
 			} else if (operands[i].trim().contains(")")) {
 				operand = operands[i].trim().replace(")", "");
 				expressionHelper(operand, equation, transTable);
-				equation.add(")");
+				for (int j = 0; j < operandSize - 1; j++) {
+					equation.add(")");
+				}
 			} else {
 				operand = operands[i].trim();
 				expressionHelper(operand, equation, transTable);
 			}
 			if (operands.length > 2) {
-				for (int op = 0; op < operator.size(); op++) {
-					if (operator.get(op).contains("/")) {
-						equation.add(operator.get(op));
-						operator.set(op, "");
-						break;
-					} else if (operator.get(op).contains("*")) {
-						equation.add(operator.get(op));
-						operator.set(op, "");
-						break;
-					} else if (operator.get(op).contains("+")) {
-						equation.add(operator.get(op));
-						operator.set(op, "");
-						break;
-					} else if (operator.get(op).contains("-")) {
-						equation.add(operator.get(op));
-						operator.set(op, "");
-						break;
+				if (i < (operands.length - 1)) {
+					int op = 0;
+					while (operator.size() > 0) {
+						if (operator.get(op).contains("/")) {
+							equation.add(operator.get(op));
+							operator.remove(op);
+							operator.trimToSize();
+							break;
+						} else if (operator.get(op).contains("*")) {
+							equation.add(operator.get(op));
+							operator.remove(op);
+							operator.trimToSize();
+							break;
+						} else if (operator.get(op).contains("+")) {
+							equation.add(operator.get(op));
+							operator.remove(op);
+							operator.trimToSize();
+							break;
+						} else if (operator.get(op).contains("-")) {
+							equation.add(operator.get(op));
+							operator.remove(op);
+							operator.trimToSize();
+							break;
+						} else {
+							operator.remove(op);
+							operator.trimToSize();
+						}
 					}
 				}
 			}
@@ -226,31 +241,30 @@ public class TransactionStmtTransformation {
 			return resultArray;
 		}
 
-		// performing arithmetic operation according to BODMAS
-		// using multiple for loops to enforce BODMAS rule
+		// ************************************ performing arithmetic operation
+		// according to BODMAS*********************************************/
 
 		// solving bracket
-		int startofB = 0;
-		int endofB = 0;
-		startofB = equation.indexOf("(");
-		endofB = equation.indexOf(")");
+		boolean isBracketThere = false;
+		String equationString = equationString(equation);
 
-		for (int i = 0; i <= equation.size(); i++) {
-			if (equation.get(i).contains("(")) {
-				endofB = equation.indexOf(")");
-				result = calculationBODMAS(operator, equation, startofB + 1, endofB);
+		while (equationString.contains("(")) {
+			isBracketThere = true;
+			ArrayList<Integer> StartandEndofBracket = findStartandEndofBracket(equation);
+			result = calculationBODMAS(equation, StartandEndofBracket.get(0) + 1, StartandEndofBracket.get(1), isBracketThere);
 
-				equation.set(startofB, Double.toString(result));
-				while (operator.get(startofB + 1) != ")") {
-					equation.remove(startofB + 1);
-					equation.trimToSize();
-				}
-				equation.remove(startofB + 1);
+			equation.set(StartandEndofBracket.get(0), Double.toString(result));
+			while (equation.get(StartandEndofBracket.get(0) + 1) != ")") {
+				equation.remove(StartandEndofBracket.get(0) + 1);
 				equation.trimToSize();
 			}
-		}
+			equation.remove(StartandEndofBracket.get(0) + 1);
+			equation.trimToSize();
 
-		result = calculationBODMAS(operator, equation, 0, equation.size());
+			equationString = equationString(equation);
+		}
+		isBracketThere = false;
+		result = calculationBODMAS(equation, 0, (equation.size() - 1), isBracketThere);
 
 		resultArray.add(1, Double.toString(result));
 
@@ -271,42 +285,80 @@ public class TransactionStmtTransformation {
 		return equation;
 	}
 
-	private double calculationBODMAS(ArrayList<String> operator, ArrayList<String> equation, int start, int end) {
-		double result = 0;
+	private double calculationBODMAS(ArrayList<String> equation, int start, int end, boolean isBracketThere) {
+		double result = 0.0;
 		// division
 		for (int k = start; k < end; k++) {
-			if (operator.get(k + 1).contains("/")) {
+			if (equation.get(k + 1).contains("/")) {
 				result = Double.parseDouble(equation.get(k)) / Double.parseDouble(equation.get(k + 2));
 				equation.set(k, Double.toString(result));
-				equation.set(k + 2, Double.toString(result));
+				end = handleMultipleOccuranceOfOperator(k+1, equation, isBracketThere);
+				k--;
 			}
 		}
 
 		// multiplication
 		for (int k = start; k < end; k++) {
-			if (operator.get(k + 1).contains("*")) {
+			if (equation.get(k + 1).contains("*")) {
 				result = Double.parseDouble(equation.get(k)) * Double.parseDouble(equation.get(k + 2));
 				equation.set(k, Double.toString(result));
-				equation.set(k + 2, Double.toString(result));
+				end = handleMultipleOccuranceOfOperator(k+1, equation, isBracketThere);
+				k--;
 			}
 		}
 
 		// addition
 		for (int k = start; k < end; k++) {
-			if (operator.get(k + 1).contains("+")) {
+			if (equation.get(k + 1).contains("+")) {
 				result = Double.parseDouble(equation.get(k)) + Double.parseDouble(equation.get(k + 2));
 				equation.set(k, Double.toString(result));
-				equation.set(k + 2, Double.toString(result));
+				end = handleMultipleOccuranceOfOperator(k+1, equation, isBracketThere);
+				k--;
 			}
 		}
 
 		// subtraction
 		for (int k = start; k < end; k++) {
-			if (operator.get(k + 1).contains("-")) {
+			if (equation.get(k + 1).contains("-")) {
 				result = Double.parseDouble(equation.get(k)) - Double.parseDouble(equation.get(k + 2));
+				equation.set(k, Double.toString(result));
+				end = handleMultipleOccuranceOfOperator(k+1, equation, isBracketThere);
+				k--;
 			}
 		}
 		return result;
 	}
 
+	private String equationString(ArrayList<String> equation) {
+		String equationString = "";
+		for (int i = 0; i < equation.size(); i++) {
+			equationString = equationString + equation.get(i);
+		}
+		return equationString;
+	}
+
+	private ArrayList<Integer> findStartandEndofBracket(ArrayList<String> equation) {
+		ArrayList<Integer> indicesofBracket = new ArrayList<Integer>();
+		int endOfBracket = 0;
+		endOfBracket = equation.indexOf(")");
+		indicesofBracket.add(0, equation.lastIndexOf("("));
+
+		if (endOfBracket < indicesofBracket.get(0)) {
+			indicesofBracket.add(1, equation.lastIndexOf(")"));
+		} else {
+			indicesofBracket.add(1, endOfBracket);
+		}
+		return indicesofBracket;
+	}
+	
+	private int handleMultipleOccuranceOfOperator(int index, ArrayList<String> equation, boolean isBracketThere) {
+		equation.remove(index);
+		equation.remove(index);
+		equation.trimToSize();
+		if (isBracketThere) {
+			return findStartandEndofBracket(equation).get(1);
+		} else {
+			return (equation.size() - 1);
+		}
+	}
 }
