@@ -45,7 +45,7 @@ public class TwoPhaseLocking {
 				transHashMap.put("x", transTable.getRow(1).getCell(0).getNumericCellValue());
 				/*
 				 * double x = transHashMap.get("x"); double xx =
-				 * transTable.getRow(1).getCell(0).getNumericCellValue(); System.out.println(x);
+				 * transTable2PL.getRow(1).getCell(0).getNumericCellValue(); System.out.println(x);
 				 * System.out.println(xx);
 				 */
 				returnString.add(0, ts + " --> x = " + transHashMap.get("x").toString());

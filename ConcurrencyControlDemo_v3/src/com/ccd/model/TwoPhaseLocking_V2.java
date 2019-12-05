@@ -1,6 +1,7 @@
 package com.ccd.model;
 
 import java.util.ArrayList;
+
 import com.ccd.controler.ControllerServlet_V2;
 import com.ccd.model.TransactionStmtTransformation;
 
@@ -33,16 +34,16 @@ public class TwoPhaseLocking_V2 {
 
 		switch (operationType) {
 		case "read":
-			if (ControllerServlet_V2.transTable.containsKey(dataElement)) {
+			if (ControllerServlet_V2.transTable2PL.containsKey(dataElement)) {
 
 				if (isExclusiveLockbyThisTransaction(dataElement) || isSharedLockbyThisTransaction(dataElement)) {
 					returnString.add(0, ts + " --> " + dataElement + " = "
-							+ ControllerServlet_V2.transTable.get(dataElement).toString());
+							+ ControllerServlet_V2.transTable2PL.get(dataElement).toString());
 				} else {
 					if (!ControllerServlet_V2.unlockStart.get(tranID)) {
 						if (putSLock(dataElement)) {
 							returnString.add(0, ts + " --> Shared lock for 'Read' --> " + dataElement + " = "
-									+ ControllerServlet_V2.transTable.get(dataElement).toString());
+									+ ControllerServlet_V2.transTable2PL.get(dataElement).toString());
 						}
 					} else
 						returnString.add(0, ts + "--> Illegal locking! No locks allowed after an unlock.");
@@ -50,10 +51,10 @@ public class TwoPhaseLocking_V2 {
 
 			} else {
 				if (!ControllerServlet_V2.unlockStart.get(tranID)) {
-					ControllerServlet_V2.lockTable.put("S" + dataElement + Long.toString(tranID), tranID);
-					ControllerServlet_V2.transTable.put(dataElement, 0.0);
+					ControllerServlet_V2.lockTable2PL.put("S" + dataElement + Long.toString(tranID), tranID);
+					ControllerServlet_V2.transTable2PL.put(dataElement, 0.0);
 					returnString.add(0, ts + " --> Share lock for 'Read' --> " + dataElement + " = "
-							+ ControllerServlet_V2.transTable.get(dataElement).toString());
+							+ ControllerServlet_V2.transTable2PL.get(dataElement).toString());
 					/*
 					 * // capture state of table for abort operation
 					 * ControllerServlet_V2.rollbackTable.put(dataElement + "tranID", 0.0);
@@ -64,7 +65,7 @@ public class TwoPhaseLocking_V2 {
 			break;
 		case "expression":
 			ArrayList<String> expressionSolution = transactionStmtTransformation.solveExpression(ts,
-					ControllerServlet_V2.transTable);
+					ControllerServlet_V2.transTable2PL);
 			if (expressionSolution.size() == 1) {
 				returnString.add(0, ts + " --> " + expressionSolution.get(0));
 			} else if (expressionSolution.size() > 1) {
@@ -77,18 +78,19 @@ public class TwoPhaseLocking_V2 {
 			/*
 			 * // capture state of table before latest "write" --- for successful abort
 			 * later // ControllerServlet_V2.rollbackTable.put(dataElement + "tranID",
-			 * ControllerServlet_V2.transTable.get(dataElement));
+			 * ControllerServlet_V2.transTable2PL.get(dataElement));
 			 */
-			if (!ControllerServlet_V2.transTable.containsKey(dataElement)) {
-				ControllerServlet_V2.transTable.put(dataElement, 0.0);
+			if (!ControllerServlet_V2.transTable2PL.containsKey(dataElement)) {
+				ControllerServlet_V2.transTable2PL.put(dataElement, 0.0);
 			}
-			if (ControllerServlet_V2.tempTable.containsKey(dataElement + Long.toString(tranID))) {
+			if (ControllerServlet_V2.expressionResultStorage2PL.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
 				returnString.add(0, write(ts, dataElement,
-						ControllerServlet_V2.tempTable.get(dataElement + Long.toString(tranID))));
-				ControllerServlet_V2.tempTable.remove(dataElement + Long.toString(tranID));
+						ControllerServlet_V2.expressionResultStorage2PL.get(dataElement + "(" + Long.toString(tranID) + ")")));
+				ControllerServlet_V2.expressionResultStorage2PL.remove(dataElement + "(" + Long.toString(tranID) + ")");
 			} else {
-				returnString.add(0, write(ts, dataElement, ControllerServlet_V2.transTable.get(dataElement)));
+				returnString.add(0, write(ts, dataElement, ControllerServlet_V2.transTable2PL.get(dataElement)));
 			}
+			
 			break;
 		case "S_Lock":
 			if (!ControllerServlet_V2.unlockStart.get(tranID)) {
@@ -109,12 +111,13 @@ public class TwoPhaseLocking_V2 {
 		case "Unlock":
 			synchronized (ControllerServlet_V2.lock) {
 				ControllerServlet_V2.unlockStart.put(tranID, true);
-				ControllerServlet_V2.lockTable.remove("S" + dataElement + Long.toString(tranID), tranID);
-				ControllerServlet_V2.lockTable.remove("X" + dataElement + Long.toString(tranID), tranID);
+				ControllerServlet_V2.lockTable2PL.remove("S" + dataElement + Long.toString(tranID), tranID);
+				ControllerServlet_V2.lockTable2PL.remove("X" + dataElement + Long.toString(tranID), tranID);
 				returnString.add(ts + " --> '" + dataElement + "' is unlocked");
 				ControllerServlet_V2.lock.notifyAll();
 			}
 			break;
+		
 		/*
 		 * case "Abort":
 		 * 
@@ -147,15 +150,15 @@ public class TwoPhaseLocking_V2 {
 		String returnString = null;
 
 		if (isExclusiveLockbyThisTransaction(dataElement)) {
-			ControllerServlet_V2.transTable.replace(dataElement, value);
+			ControllerServlet_V2.transTable2PL.replace(dataElement, value);
 			returnString = ts + " --> " + dataElement + " = "
-					+ ControllerServlet_V2.transTable.get(dataElement).toString();
+					+ ControllerServlet_V2.transTable2PL.get(dataElement).toString();
 		} else {
 			if (!ControllerServlet_V2.unlockStart.get(tranID)) {
 				if (putXLock(dataElement)) {
-					ControllerServlet_V2.transTable.replace(dataElement, value);
+					ControllerServlet_V2.transTable2PL.replace(dataElement, value);
 					returnString = ts + " --> Exclusive lock for 'Update' --> " + dataElement + " = "
-							+ ControllerServlet_V2.transTable.get(dataElement).toString();
+							+ ControllerServlet_V2.transTable2PL.get(dataElement).toString();
 				}
 			} else
 				returnString = ts + "--> Illegal locking! No locks allowed after an unlock.";
@@ -180,7 +183,7 @@ public class TwoPhaseLocking_V2 {
 			while (isExclusiveLockbyOtherTransaction(dataElement)) {
 				ControllerServlet_V2.lock.wait();
 			}
-			ControllerServlet_V2.lockTable.put("S" + dataElement + Long.toString(tranID), tranID);
+			ControllerServlet_V2.lockTable2PL.put("S" + dataElement + Long.toString(tranID), tranID);
 			return true;
 		}
 	}
@@ -204,9 +207,9 @@ public class TwoPhaseLocking_V2 {
 				ControllerServlet_V2.lock.wait();
 			}
 			if (isSharedLockbyThisTransaction(dataElement)) {
-				ControllerServlet_V2.lockTable.remove("S" + dataElement + Long.toString(tranID), tranID);
+				ControllerServlet_V2.lockTable2PL.remove("S" + dataElement + Long.toString(tranID), tranID);
 			}
-			ControllerServlet_V2.lockTable.put("X" + dataElement + Long.toString(tranID), tranID);
+			ControllerServlet_V2.lockTable2PL.put("X" + dataElement + Long.toString(tranID), tranID);
 			return true;
 		}
 	}
@@ -221,8 +224,8 @@ public class TwoPhaseLocking_V2 {
 
 		boolean bool = false;
 		for (long i : ControllerServlet_V2.tranIDList) {
-			if (ControllerServlet_V2.lockTable.containsKey("S" + dataElement + Long.toString(i))
-					&& ControllerServlet_V2.lockTable.get("S" + dataElement + Long.toString(i)) != tranID) {
+			if (ControllerServlet_V2.lockTable2PL.containsKey("S" + dataElement + Long.toString(i))
+					&& ControllerServlet_V2.lockTable2PL.get("S" + dataElement + Long.toString(i)) != tranID) {
 				bool = true;
 				break;
 			} else {
@@ -243,8 +246,8 @@ public class TwoPhaseLocking_V2 {
 
 		boolean bool = false;
 		for (long i : ControllerServlet_V2.tranIDList) {
-			if (ControllerServlet_V2.lockTable.containsKey("X" + dataElement + Long.toString(i))
-					&& ControllerServlet_V2.lockTable.get("X" + dataElement + Long.toString(i)) != tranID) {
+			if (ControllerServlet_V2.lockTable2PL.containsKey("X" + dataElement + Long.toString(i))
+					&& ControllerServlet_V2.lockTable2PL.get("X" + dataElement + Long.toString(i)) != tranID) {
 				bool = true;
 				break;
 			} else {
@@ -262,7 +265,7 @@ public class TwoPhaseLocking_V2 {
 	 */
 	private boolean isExclusiveLockbyThisTransaction(String dataElement) {
 
-		if (ControllerServlet_V2.lockTable.containsKey("X" + dataElement + Long.toString(tranID))) {
+		if (ControllerServlet_V2.lockTable2PL.containsKey("X" + dataElement + Long.toString(tranID))) {
 			return true;
 		} else {
 			return false;
@@ -277,7 +280,7 @@ public class TwoPhaseLocking_V2 {
 	 */
 	private boolean isSharedLockbyThisTransaction(String dataElement) {
 
-		if (ControllerServlet_V2.lockTable.containsKey("S" + dataElement + Long.toString(tranID))) {
+		if (ControllerServlet_V2.lockTable2PL.containsKey("S" + dataElement + Long.toString(tranID))) {
 			return true;
 		} else {
 			return false;
