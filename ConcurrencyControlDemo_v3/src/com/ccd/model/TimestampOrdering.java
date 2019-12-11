@@ -25,8 +25,10 @@ public class TimestampOrdering {
 		boolean shouldAbort = checkBTOrule(operationType, dataElement);
 		if (shouldAbort) {
 			abort(Long.toString(tranID));
-			returnString.add(0, ts + " --> " + "ABORTED Transaction #" + tranID + " ! with timestamp: "
-					+ timeStamp(ControllerServlet_V2.transTimeStamp.get(tranID)) + " Not compliant with BTO rule! ");
+			returnString.add(0,
+					ts + " --> " + "<font color=\"red\"> <b>ABORTED Transaction #" + tranID + " !</b> with timestamp: "
+							+ timeStamp(ControllerServlet_V2.transTimeStamp.get(tranID))
+							+ " Not compliant with BTO rule! </font><br/>");
 			returnString.add(1, "abort");
 			return returnString;
 		}
@@ -54,7 +56,7 @@ public class TimestampOrdering {
 			}
 
 			// update read-from relation
-			//updateReadFromRelation(dataElement);
+			// updateReadFromRelation(dataElement);
 
 			break;
 		case "expression":
@@ -90,13 +92,14 @@ public class TimestampOrdering {
 				oldValue = ControllerServlet_V2.transTableTO.get(dataElement).toString();
 			}
 
-			if (ControllerServlet_V2.expressionResultStorageTO.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
+			if (ControllerServlet_V2.expressionResultStorageTO
+					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
 
-				newValue = ControllerServlet_V2.expressionResultStorageTO.get(dataElement + "(" + Long.toString(tranID) + ")")
-						.toString();
+				newValue = ControllerServlet_V2.expressionResultStorageTO
+						.get(dataElement + "(" + Long.toString(tranID) + ")").toString();
 
-				returnString.add(0, write(ts, dataElement,
-						ControllerServlet_V2.expressionResultStorageTO.get(dataElement + "(" + Long.toString(tranID) + ")")));
+				returnString.add(0, write(ts, dataElement, ControllerServlet_V2.expressionResultStorageTO
+						.get(dataElement + "(" + Long.toString(tranID) + ")")));
 				ControllerServlet_V2.expressionResultStorageTO.remove(dataElement + "(" + Long.toString(tranID) + ")");
 			} else {
 				newValue = ControllerServlet_V2.transTableTO.get(dataElement).toString();
@@ -109,7 +112,7 @@ public class TimestampOrdering {
 					oldValue + "|" + newValue);
 
 			// update final-write table
-			//ControllerServlet_V2.finalwriteTableTO.put(dataElement, tranID);
+			// ControllerServlet_V2.finalwriteTableTO.put(dataElement, tranID);
 
 			break;
 		}
@@ -141,45 +144,57 @@ public class TimestampOrdering {
 	private boolean checkBTOrule(String operationType, String dataElement) {
 
 		boolean shouldAbort = false;
-		if (operationType == "read") {
-			for (long i : ControllerServlet_V2.tranIDList) {
-				if (i != tranID) {
-					String keyToCompare = Long.toString(i) + "write" + dataElement;
-					if (ControllerServlet_V2.operationTimeStamp.containsKey(keyToCompare)) {
-						if (ControllerServlet_V2.transTimeStamp.get(i) > ControllerServlet_V2.transTimeStamp
-								.get(tranID)) {
-							shouldAbort = true;
-							break;
-						}
 
-					}
-				}
-			}
-		} else if (operationType == "write") {
-			for (long i : ControllerServlet_V2.tranIDList) {
-				if (i != tranID) {
-					String readKeyToCompare = Long.toString(i) + "read" + dataElement;
-					String writeKeyToCompare = Long.toString(i) + "write" + dataElement;
-					if (ControllerServlet_V2.operationTimeStamp.containsKey(readKeyToCompare)) {
-						if (ControllerServlet_V2.transTimeStamp.get(i) > ControllerServlet_V2.transTimeStamp
-								.get(tranID)) {
-							shouldAbort = true;
-							break;
-						}
-					} else if (ControllerServlet_V2.operationTimeStamp.containsKey(writeKeyToCompare)) {
-						if (ControllerServlet_V2.transTimeStamp.get(i) > ControllerServlet_V2.transTimeStamp
-								.get(tranID)) {
-							shouldAbort = true;
-							break;
+		try {
+			if (operationType == "read") {
+				for (long i : ControllerServlet_V2.tranIDList) {
+					if (i != tranID) {
+						String keyToCompare = Long.toString(i) + "write" + dataElement;
+						if (ControllerServlet_V2.operationTimeStamp.containsKey(keyToCompare)) {
+							//if (ControllerServlet_V2.transTimeStamp
+							//		.get(tranID) < ControllerServlet_V2.operationTimeStamp.get(keyToCompare)) {
+								if (ControllerServlet_V2.transTimeStamp
+										.get(tranID) < ControllerServlet_V2.transTimeStamp.get(i)) {
+									shouldAbort = true;
+									break;
+								}
+							//}
 						}
 					}
 				}
+			} else if (operationType == "write") {
+				for (long i : ControllerServlet_V2.tranIDList) {
+					if (i != tranID) {
+						String readKeyToCompare = Long.toString(i) + "read" + dataElement;
+						String writeKeyToCompare = Long.toString(i) + "write" + dataElement;
+						if (ControllerServlet_V2.operationTimeStamp.containsKey(readKeyToCompare)) {
+							//if (ControllerServlet_V2.transTimeStamp
+							//		.get(tranID) < ControllerServlet_V2.operationTimeStamp.get(readKeyToCompare)) {
+								if (ControllerServlet_V2.transTimeStamp
+										.get(tranID) < ControllerServlet_V2.transTimeStamp.get(i)) {
+									shouldAbort = true;
+									break;
+								}
+							//}
+						} else if (ControllerServlet_V2.operationTimeStamp.containsKey(writeKeyToCompare)) {
+							//if (ControllerServlet_V2.transTimeStamp
+							//		.get(tranID) < ControllerServlet_V2.operationTimeStamp.get(writeKeyToCompare)) {
+								if (ControllerServlet_V2.transTimeStamp
+										.get(tranID) < ControllerServlet_V2.transTimeStamp.get(i)) {
+									shouldAbort = true;
+									break;
+								}
+							//}
+						}
+					}
+				}
 			}
+		} catch (NullPointerException e) {
+			e.printStackTrace();
 		}
 		return shouldAbort;
 
 	}
-
 
 	public void abort(String tranID) {
 		// ** undo 'write' modifications by current tranID since it is aborted

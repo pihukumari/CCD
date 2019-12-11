@@ -63,10 +63,12 @@ public class ControllerServlet_V2 extends HttpServlet {
 
 	long tranID;
 	private int nmbrOfCallsToServlet;
+	private int callNmbrForNullAlgorithm;
 
 	public void init() {
 		tranID = 1;
 		nmbrOfCallsToServlet = 0;
+		callNmbrForNullAlgorithm = 0;
 	}
 
 	/**
@@ -129,20 +131,30 @@ public class ControllerServlet_V2 extends HttpServlet {
 					|| ts.get(0).toLowerCase().contains("wait and retry")) {
 
 				try {
-					result.add(0, commitTransaction(ts.get(0), currentAlgorithm, sessonTranPair.get(ts.get(1))));
+					if (currentAlgorithm == null) {
+						result.add(0, "<font color=\"red\">Please select an algorithm!</font>");
+						nmbrOfCallsToServlet = 0;
+					} else {
+						result.add(0, commitTransaction(ts.get(0), currentAlgorithm, sessonTranPair.get(ts.get(1))));
+					}
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
 				session = request.getSession(); // has to be called again after the wait() to regain the state of the
 												// session of the waiting request.
 				nmbrOfCallsToServlet++;
+				if (nmbrOfCallsToServlet == 2 && session.getAttribute("t1")
+						.equals("<font color=\"red\">Please select an algorithm!</font>")) {
+					nmbrOfCallsToServlet = 1;
+				}
 				request.setAttribute("counter", nmbrOfCallsToServlet);
 				session.setAttribute("t" + Integer.toString(nmbrOfCallsToServlet), result.get(0));
 
 				// for FOCC algorithm, when just providing msg for available options, we do not
 				// have to increment the transaction ID, rest of the time we have to increment
 				// since the current transaction is committed
-				if (!result.get(0).contains("This transaction Conflicts with another active transaction #")) {
+				if (!result.get(0).contains("This transaction Conflicts with another active transaction #")
+						&& !result.get(0).contains("Please select an algorithm!")) {
 
 					tranIDList.add(tranID);
 					unlockStart.put(tranID, false);
@@ -157,12 +169,22 @@ public class ControllerServlet_V2 extends HttpServlet {
 			else {
 
 				try {
-					result = concurrencyAlgorithm(ts.get(0), currentAlgorithm, sessonTranPair.get(ts.get(1)));
-
+					if (currentAlgorithm == null) {
+						result.add(0, "<font color=\"red\">Please select an algorithm!</font>");
+						nmbrOfCallsToServlet = 0;
+					} else {
+						result = concurrencyAlgorithm(ts.get(0), currentAlgorithm, sessonTranPair.get(ts.get(1)));
+					}
 					session = request.getSession(); // has to be called again after the wait() to regain the state
 													// of
 													// the session of the waiting request.
 					nmbrOfCallsToServlet++;
+
+					if (nmbrOfCallsToServlet == 2 && session.getAttribute("t1")
+							.equals("<font color=\"red\">Please select an algorithm!</font>")) {
+						nmbrOfCallsToServlet = 1;
+					}
+
 					request.setAttribute("counter", nmbrOfCallsToServlet);
 					session.setAttribute("t" + Integer.toString(nmbrOfCallsToServlet), result.get(0));
 					session.setAttribute("tranID", sessonTranPair.get(ts.get(1)));
@@ -177,7 +199,6 @@ public class ControllerServlet_V2 extends HttpServlet {
 			dispatcher.forward(request, response);
 			lock.notifyAll();
 		}
-		// dispatcher.forward(request, response);
 
 	}
 
@@ -202,7 +223,9 @@ public class ControllerServlet_V2 extends HttpServlet {
 	 */
 	public ArrayList<String> concurrencyAlgorithm(String ts, String algorithm, long tranID)
 			throws InterruptedException {
+
 		ArrayList<String> result = null;
+
 		if (algorithm.contains("Two-Phase Locking")) {
 			session.removeAttribute("timestamp");
 			TwoPhaseLocking_V2 twoPL = new TwoPhaseLocking_V2(tranID);
@@ -265,8 +288,6 @@ public class ControllerServlet_V2 extends HttpServlet {
 				}
 			}
 
-		} else if (algorithm.contains("Snapshot Isolation")) {
-
 		}
 		return result;
 	}
@@ -300,25 +321,10 @@ public class ControllerServlet_V2 extends HttpServlet {
 				}
 			}
 
-			// Create a Iterator to KeySet of temp table
-			Iterator<String> tempKeyset = expressionResultStorage2PL.keySet().iterator();
+			modifyTempTable(expressionResultStorage2PL, tranID);
 
-			// Iterate over all the elements to find keys related to committed transaction
-			// modify the keys in order to retain the temp values for further operations
-			// after commit
-			while (tempKeyset.hasNext()) {
-				String key = tempKeyset.next();
-				// Check if Value associated with Key is equal to tranID for this commit
-				if (key.contains("(" + Long.toString(tranID) + ")")) {
-					String newKey = key.replace("(" + Long.toString(tranID) + ")",
-							"(" + Long.toString(this.tranID) + ")");
-					expressionResultStorage2PL.put(newKey, expressionResultStorage2PL.get(key));
-					tempKeyset.remove();
-				}
-			}
-
-			commitMessage = "committed transaction #" + Long.toString(tranID)
-					+ " ! <br/> ******************************************* <br/>";
+			commitMessage = "<font color=\"blue\"> <b>committed transaction #" + Long.toString(tranID)
+					+ " !</b></font> <br/>";
 
 		} else if (algorithm.contains("Timestamp Ordering")) {
 			// Create a Iterator to KeySet of rollback table
@@ -335,53 +341,25 @@ public class ControllerServlet_V2 extends HttpServlet {
 				}
 			}
 
-			// Create a Iterator to KeySet of temp table
-			Iterator<String> tempKeyset = expressionResultStorageTO.keySet().iterator();
+			modifyTempTable(expressionResultStorageTO, tranID);
 
-			// Iterate over all the elements to find keys related to committed transaction
-			// modify the keys in order to retain the temp values for further operations
-			// after commit
-			while (tempKeyset.hasNext()) {
-				String key = tempKeyset.next();
-				// Check if Value associated with Key is equal to tranID for this commit
-				if (key.contains("(" + Long.toString(tranID) + ")")) {
-					String newKey = key.replace("(" + Long.toString(tranID) + ")",
-							"(" + Long.toString(this.tranID) + ")");
-					expressionResultStorageTO.put(newKey, expressionResultStorageTO.get(key));
-					tempKeyset.remove();
-				}
-			}
-
-			commitMessage = "committed transaction #" + Long.toString(tranID)
-					+ " ! <br/> ******************************************* <br/>";
+			commitMessage = "<font color=\"blue\"> <b>committed transaction #" + Long.toString(tranID)
+					+ " !</b></font> <br/>";
 
 		} else if (algorithm.contains("Optimistic Concurrency Control BOCC")) {
 
 			OptimisticConcurrencyControlBOCC bocc = new OptimisticConcurrencyControlBOCC(tranID);
 			bocc.validateTransaction();
 			if (transactionPhaseBOCC.get(tranID) != "validated") {
-				commitMessage = "ABORTED Transaction #" + Long.toString(tranID) + "--> BOCC Validation failed!"
-						+ transactionPhaseBOCC.get(tranID) + " <br/> ******************************************* <br/>";
+				commitMessage = "<font color=\"red\"> <b>ABORTED Transaction #" + Long.toString(tranID)
+						+ "--> BOCC Validation failed!</b>" + transactionPhaseBOCC.get(tranID) + "</font> <br/>";
 			} else if (transactionPhaseBOCC.get(tranID) == "validated") {
-				commitMessage = "Validated and Committed Transaction #" + Long.toString(tranID) + " ! <br/> ******************************************* <br/>";
+				commitMessage = "<font color=\"blue\"> <b>Validated and Committed Transaction #" + Long.toString(tranID)
+						+ " ! </b></font><br/>";
 			}
 
-			// Create a Iterator to KeySet of temp table
-			Iterator<String> tempKeyset = expressionResultStorageBOCC.keySet().iterator();
+			modifyTempTable(expressionResultStorageBOCC, tranID);
 
-			// Iterate over all the elements to find keys related to committed transaction
-			// modify the keys in order to retain the temp values for further operations
-			// after commit
-			while (tempKeyset.hasNext()) {
-				String key = tempKeyset.next();
-				// Check if Value associated with Key is equal to tranID for this commit
-				if (key.contains("(" + Long.toString(tranID) + ")")) {
-					String newKey = key.replace("(" + Long.toString(tranID) + ")",
-							"(" + Long.toString(this.tranID) + ")");
-					expressionResultStorageBOCC.put(newKey, expressionResultStorageBOCC.get(key));
-					tempKeyset.remove();
-				}
-			}
 		} else if (algorithm.contains("Optimistic Concurrency Control FOCC")) {
 
 			// for option - wait and retry : wait until the conflicting transaction is
@@ -412,14 +390,46 @@ public class ControllerServlet_V2 extends HttpServlet {
 						+ "<br/> - Wait and Retry validation later <br/>";
 			} else if (transactionPhaseFOCC.get(conflictingTranID) == "validated") {
 				// message for successful validation
-				commitMessage = "Validated and Committed Transaction #" + Long.toString(tranID) + " ! <br/> ******************************************* <br/>";
+				commitMessage = "<font color=\"blue\"> <b>Validated and Committed Transaction #" + Long.toString(tranID)
+						+ " ! </b></font><br/>";
+				modifyTempTable(expressionResultStorageFOCC, tranID);
 			} else if (transactionPhaseFOCC.get(conflictingTranID) == "committed") {
 				// this message is for read-only transactions
-				commitMessage = "Committed Transaction #" + Long.toString(tranID) + " ! <br/> ******************************************* <br/>";
+				commitMessage = "<font color=\"blue\"> <b>Committed Transaction #" + Long.toString(tranID)
+						+ " ! </b></font><br/>";
+				modifyTempTable(expressionResultStorageFOCC, tranID);
 			}
 		}
 
 		return commitMessage;
+	}
+
+	private void modifyTempTable(HashMap<String, Double> tempTable, Long tranID) {
+		// Create a Iterator to KeySet of temp table
+		Iterator<String> tempKeyset = tempTable.keySet().iterator();
+
+		// Iterate over all the elements to find keys related to committed transaction
+		// modify the keys in order to retain the temp values for further operations
+		// after commit
+		ArrayList<String> newKeys = new ArrayList<String>();
+		ArrayList<Double> values = new ArrayList<Double>();
+		while (tempKeyset.hasNext()) {
+			String key = tempKeyset.next();
+			// Check if Value associated with Key is equal to tranID for this commit
+			if (key.contains("(" + Long.toString(tranID) + ")")) {
+				newKeys.add(key.replace("(" + Long.toString(tranID) + ")", "(" + Long.toString(this.tranID) + ")"));
+				values.add(tempTable.get(key));
+				// remove if Value associated with Key is equal to tranID of committed
+				// transaction
+				tempKeyset.remove();
+			}
+		}
+
+		// saving the temp values associated with current tranID, to make it available
+		// for next transaction
+		for (int i = 0; i < newKeys.size(); i++) {
+			tempTable.put(newKeys.get(i), values.get(i));
+		}
 	}
 
 }

@@ -35,7 +35,11 @@ public class OptimisticConcurrencyControlBOCC {
 			ControllerServlet_V2.readSetBOCC.put(dataElement + "(" + Long.toString(tranID) + ")", tranID);
 
 			// read the data
-			if (ControllerServlet_V2.transTableBOCC.containsKey(dataElement)) {
+			if (ControllerServlet_V2.privateWorkspaceBOCC
+					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
+				returnString.add(0, ts + " --> " + dataElement + " = " + ControllerServlet_V2.privateWorkspaceBOCC
+						.get(dataElement + "(" + Long.toString(tranID) + ")").toString());
+			} else if (ControllerServlet_V2.transTableBOCC.containsKey(dataElement)) {
 				returnString.add(0, ts + " --> " + dataElement + " = "
 						+ ControllerServlet_V2.transTableBOCC.get(dataElement).toString());
 

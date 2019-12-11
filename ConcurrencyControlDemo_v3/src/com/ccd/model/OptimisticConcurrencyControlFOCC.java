@@ -48,7 +48,11 @@ public class OptimisticConcurrencyControlFOCC {
 			ControllerServlet_V2.readSetFOCC.put(dataElement + "(" + Long.toString(tranID) + ")", tranID);
 
 			// read the data
-			if (ControllerServlet_V2.transTableFOCC.containsKey(dataElement)) {
+			if (ControllerServlet_V2.privateWorkspaceFOCC
+					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
+				returnString.add(0, ts + " --> " + dataElement + " = " + ControllerServlet_V2.privateWorkspaceFOCC
+						.get(dataElement + "(" + Long.toString(tranID) + ")").toString());
+			} else if (ControllerServlet_V2.transTableFOCC.containsKey(dataElement)) {
 				returnString.add(0, ts + " --> " + dataElement + " = "
 						+ ControllerServlet_V2.transTableFOCC.get(dataElement).toString());
 
@@ -79,11 +83,13 @@ public class OptimisticConcurrencyControlFOCC {
 				ControllerServlet_V2.privateWorkspaceFOCC.put(dataElement + "(" + Long.toString(tranID) + ")", 0.0);
 			}
 
-			if (ControllerServlet_V2.expressionResultStorageFOCC.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
+			if (ControllerServlet_V2.expressionResultStorageFOCC
+					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
 
-				returnString.add(0, write(ts, dataElement,
-						ControllerServlet_V2.expressionResultStorageFOCC.get(dataElement + "(" + Long.toString(tranID) + ")")));
-				ControllerServlet_V2.expressionResultStorageFOCC.remove(dataElement + "(" + Long.toString(tranID) + ")");
+				returnString.add(0, write(ts, dataElement, ControllerServlet_V2.expressionResultStorageFOCC
+						.get(dataElement + "(" + Long.toString(tranID) + ")")));
+				ControllerServlet_V2.expressionResultStorageFOCC
+						.remove(dataElement + "(" + Long.toString(tranID) + ")");
 			} else {
 				returnString.add(0, write(ts, dataElement, ControllerServlet_V2.privateWorkspaceFOCC
 						.get(dataElement + "(" + Long.toString(tranID) + ")")));
@@ -229,8 +235,9 @@ public class OptimisticConcurrencyControlFOCC {
 
 				// clear private workspace by removing used data
 				privateWorkspaceIterator.remove();
-				//ControllerServlet_V2.privateWorkspaceFOCC.remove(key);
-				//privateWorkspaceIterator = ControllerServlet_V2.privateWorkspaceFOCC.keySet().iterator();
+				// ControllerServlet_V2.privateWorkspaceFOCC.remove(key);
+				// privateWorkspaceIterator =
+				// ControllerServlet_V2.privateWorkspaceFOCC.keySet().iterator();
 			}
 		}
 
@@ -242,46 +249,47 @@ public class OptimisticConcurrencyControlFOCC {
 	 * the transaction to specified "phaseState".
 	 * 
 	 * @param tranID
-	 * @param phaseState - String parameter 
+	 * @param phaseState - String parameter
 	 */
 	private void abort(Long tranID, String phaseState) {
 
 		// aborted according to // FOCC validation rule // clear the workspace, i.e,
-			// discard the modifications
-			Iterator<String> privateWorkspaceIterator = ControllerServlet_V2.privateWorkspaceFOCC.keySet().iterator();
+		// discard the modifications
+		Iterator<String> privateWorkspaceIterator = ControllerServlet_V2.privateWorkspaceFOCC.keySet().iterator();
 
-			while (privateWorkspaceIterator.hasNext()) {
-				String key = privateWorkspaceIterator.next();
-				if (key.contains("(" + Long.toString(tranID) + ")")) {
-					privateWorkspaceIterator.remove();
-					//ControllerServlet_V2.privateWorkspaceFOCC.remove(key);
-					//privateWorkspaceIterator = ControllerServlet_V2.privateWorkspaceFOCC.keySet().iterator();
-				}
+		while (privateWorkspaceIterator.hasNext()) {
+			String key = privateWorkspaceIterator.next();
+			if (key.contains("(" + Long.toString(tranID) + ")")) {
+				privateWorkspaceIterator.remove();
+				// ControllerServlet_V2.privateWorkspaceFOCC.remove(key);
+				// privateWorkspaceIterator =
+				// ControllerServlet_V2.privateWorkspaceFOCC.keySet().iterator();
 			}
+		}
 
-			// set the current transaction as aborted in the phase table
-			ControllerServlet_V2.transactionPhaseFOCC.replace(tranID, phaseState);
+		// set the current transaction as aborted in the phase table
+		ControllerServlet_V2.transactionPhaseFOCC.replace(tranID, phaseState);
 
-			// remove read set for this aborted transaction
-			Iterator<String> readSet = ControllerServlet_V2.readSetFOCC.keySet().iterator();
-			while (readSet.hasNext()) {
-				String rsKey = readSet.next();
-				if (rsKey.contains("(" + Long.toString(tranID) + ")")) {
-					readSet.remove();
-					//ControllerServlet_V2.readSetFOCC.remove(rsKey);
-					//readSet = ControllerServlet_V2.readSetFOCC.keySet().iterator();
-				}
+		// remove read set for this aborted transaction
+		Iterator<String> readSet = ControllerServlet_V2.readSetFOCC.keySet().iterator();
+		while (readSet.hasNext()) {
+			String rsKey = readSet.next();
+			if (rsKey.contains("(" + Long.toString(tranID) + ")")) {
+				readSet.remove();
+				// ControllerServlet_V2.readSetFOCC.remove(rsKey);
+				// readSet = ControllerServlet_V2.readSetFOCC.keySet().iterator();
 			}
-			// remove write set for this aborted transaction
-			Iterator<String> writeSet = ControllerServlet_V2.writeSetFOCC.keySet().iterator();
-			while (writeSet.hasNext()) {
-				String wsKey = writeSet.next();
-				if (wsKey.contains("(" + Long.toString(tranID) + ")")) {
-					writeSet.remove();
-					//ControllerServlet_V2.writeSetFOCC.remove(wsKey);
-					//readSet = ControllerServlet_V2.writeSetFOCC.keySet().iterator();
-				}
+		}
+		// remove write set for this aborted transaction
+		Iterator<String> writeSet = ControllerServlet_V2.writeSetFOCC.keySet().iterator();
+		while (writeSet.hasNext()) {
+			String wsKey = writeSet.next();
+			if (wsKey.contains("(" + Long.toString(tranID) + ")")) {
+				writeSet.remove();
+				// ControllerServlet_V2.writeSetFOCC.remove(wsKey);
+				// readSet = ControllerServlet_V2.writeSetFOCC.keySet().iterator();
 			}
+		}
 	}
 
 }

@@ -47,7 +47,7 @@ if (request.getAttribute("counter") != null) {
 	<br />
 	<br />
 	<form action="controllerV2" method="post">
-		<input type="text" name="ts" placeholder="e.g., read(x)" /> &nbsp; 
+		<input type="text" name="ts" placeholder="e.g., read(x) or r(x)" /> &nbsp; 
 		<input type="submit" value="execute" /> &nbsp;
 		
 	</form>

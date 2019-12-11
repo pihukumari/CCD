@@ -58,7 +58,7 @@ public class TransactionStmtTransformation {
 		}
 		return c;
 	}
-	
+
 	/**
 	 * To perform arithmetic operations for equations with more than 2 operands.
 	 * 
@@ -71,111 +71,120 @@ public class TransactionStmtTransformation {
 	 *         message is placed at index = 0.
 	 */
 	public ArrayList<String> solveExpression(String ts, HashMap<String, Double> transTable) {
-		String ts1 = null;
 
 		// will store data item and its value, e.g., x and value of x
 		ArrayList<String> resultArray = new ArrayList<String>();
-		double result = 0.0;
-		ArrayList<String> operator = new ArrayList<String>();
 
-		// Remove spaces
-		ts = ts.replace(" ", "");
+		// check if the input 'ts' is actually an expression or not
+		if (!ts.contains("=")) {
+			// if not an expression
+			resultArray.add("Invalid input");
+			
+		} else {
 
-		// extract operands x, y and numbers
-		String[] operands = ts.split("[=+-/*]");
-		// String[] operands = ts.split("\\p{Punct}");
+			String ts1 = null;
 
-		// Remove any number of digits with just one alphabet 'q', i.e., 100 with 'q' or
-		// 1 with 'q'
-		// this will help in extracting arithmetic operators with split function without
-		// any unwanted empty indices
-		ts1 = ts.replaceAll("[0-9]+", "q");
+			double result = 0.0;
+			ArrayList<String> operator = new ArrayList<String>();
 
-		// extract assignment and arithmetic operators
-		String[] operators = ts1.split("[a-zA-Z()]");
+			// Remove spaces
+			ts = ts.replace(" ", "");
 
-		resultArray.add(0, operands[0]);
+			// extract operands x, y and numbers
+			String[] operands = ts.split("[=+-/*]");
+			// String[] operands = ts.split("\\p{Punct}");
 
-		// store operators +,-,*,/ from the incoming equation "ts" into ArrayList
-		// 'operator'
-		if (operands.length > 2) {
-			for (int op = 2; op < operators.length; op++) {
-				operator.add(operators[op].trim());
-			}
-		}
-		// store values for variables, in the incoming equation "ts", in integer form
-		// to perform calculations later
-		for (int i = 1; i < operands.length; i++) {
-			String operand = null;
-			operand = operands[i].trim();
-			addOperatorAroundBracketsIFMissing(operand, transTable);
+			// Remove any number of digits with just one alphabet 'q', i.e., 100 with 'q' or
+			// 1 with 'q'
+			// this will help in extracting arithmetic operators with split function without
+			// any unwanted empty indices
+			ts1 = ts.replaceAll("[0-9]+", "q");
 
+			// extract assignment and arithmetic operators
+			String[] operators = ts1.split("[a-zA-Z()]");
+
+			resultArray.add(0, operands[0]);
+
+			// store operators +,-,*,/ from the incoming equation "ts" into ArrayList
+			// 'operator'
 			if (operands.length > 2) {
-				if (i < (operands.length - 1)) {
-					int op = 0;
-					while (operator.size() > 0) {
-						if (operator.get(op).contains("/")) {
-							equation.add(operator.get(op));
-							operator.remove(op);
-							operator.trimToSize();
-							break;
-						} else if (operator.get(op).contains("*")) {
-							equation.add(operator.get(op));
-							operator.remove(op);
-							operator.trimToSize();
-							break;
-						} else if (operator.get(op).contains("+")) {
-							equation.add(operator.get(op));
-							operator.remove(op);
-							operator.trimToSize();
-							break;
-						} else if (operator.get(op).contains("-")) {
-							equation.add(operator.get(op));
-							operator.remove(op);
-							operator.trimToSize();
-							break;
-						} else {
-							operator.remove(op);
-							operator.trimToSize();
+				for (int op = 2; op < operators.length; op++) {
+					operator.add(operators[op].trim());
+				}
+			}
+			// store values for variables, in the incoming equation "ts", in integer form
+			// to perform calculations later
+			for (int i = 1; i < operands.length; i++) {
+				String operand = null;
+				operand = operands[i].trim();
+				addOperatorAroundBracketsIFMissing(operand, transTable);
+
+				if (operands.length > 2) {
+					if (i < (operands.length - 1)) {
+						int op = 0;
+						while (operator.size() > 0) {
+							if (operator.get(op).contains("/")) {
+								equation.add(operator.get(op));
+								operator.remove(op);
+								operator.trimToSize();
+								break;
+							} else if (operator.get(op).contains("*")) {
+								equation.add(operator.get(op));
+								operator.remove(op);
+								operator.trimToSize();
+								break;
+							} else if (operator.get(op).contains("+")) {
+								equation.add(operator.get(op));
+								operator.remove(op);
+								operator.trimToSize();
+								break;
+							} else if (operator.get(op).contains("-")) {
+								equation.add(operator.get(op));
+								operator.remove(op);
+								operator.trimToSize();
+								break;
+							} else {
+								operator.remove(op);
+								operator.trimToSize();
+							}
 						}
 					}
 				}
 			}
-		}
 
-		if (equation.size() == 1) {
-			resultArray.add(1, equation.get(0).toString());
-			return resultArray;
-		}
+			if (equation.size() == 1) {
+				resultArray.add(1, equation.get(0).toString());
+				return resultArray;
+			}
 
-		// ************************************ performing arithmetic operation
-		// according to BODMAS*********************************************/
+			// ************************************ performing arithmetic operation
+			// according to BODMAS*********************************************/
 
-		// solving bracket
-		boolean isBracketThere = false;
-		String equationString = equationString(equation);
+			// solving bracket
+			boolean isBracketThere = false;
+			String equationString = equationString(equation);
 
-		while (equationString.contains("(")) {
-			isBracketThere = true;
-			ArrayList<Integer> StartandEndofBracket = findStartandEndofBracket(equation);
-			result = calculationBODMAS(equation, StartandEndofBracket.get(0) + 1, StartandEndofBracket.get(1),
-					isBracketThere, result);
+			while (equationString.contains("(")) {
+				isBracketThere = true;
+				ArrayList<Integer> StartandEndofBracket = findStartandEndofBracket(equation);
+				result = calculationBODMAS(equation, StartandEndofBracket.get(0) + 1, StartandEndofBracket.get(1),
+						isBracketThere, result);
 
-			equation.set(StartandEndofBracket.get(0), Double.toString(result));
-			while (equation.get(StartandEndofBracket.get(0) + 1) != ")") {
+				equation.set(StartandEndofBracket.get(0), Double.toString(result));
+				while (equation.get(StartandEndofBracket.get(0) + 1) != ")") {
+					equation.remove(StartandEndofBracket.get(0) + 1);
+					equation.trimToSize();
+				}
 				equation.remove(StartandEndofBracket.get(0) + 1);
 				equation.trimToSize();
+
+				equationString = equationString(equation);
 			}
-			equation.remove(StartandEndofBracket.get(0) + 1);
-			equation.trimToSize();
+			isBracketThere = false;
+			result = calculationBODMAS(equation, 0, (equation.size() - 1), isBracketThere, result);
 
-			equationString = equationString(equation);
+			resultArray.add(1, Double.toString(result));
 		}
-		isBracketThere = false;
-		result = calculationBODMAS(equation, 0, (equation.size() - 1), isBracketThere, result);
-
-		resultArray.add(1, Double.toString(result));
-
 		return resultArray;
 
 	}

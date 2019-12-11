@@ -11,15 +11,6 @@
   </welcome-file-list>
   
   <servlet>
-  	<servlet-name>ControllerServlet</servlet-name>
-  	<servlet-class>com.ccd.controler.ControllerServlet</servlet-class> 
-  	<!-- <load-on-startup>0</load-on-startup> -->
-  </servlet>
-  <servlet-mapping>
-  	<servlet-name>ControllerServlet</servlet-name>
-  	<url-pattern>/controller</url-pattern>
-  </servlet-mapping>
-  <servlet>
   	<servlet-name>ControllerServlet_V2</servlet-name>
   	<servlet-class>com.ccd.controler.ControllerServlet_V2</servlet-class> 
   	<load-on-startup>0</load-on-startup>
@@ -28,4 +19,12 @@
   	<servlet-name>ControllerServlet_V2</servlet-name>
   	<url-pattern>/controllerV2</url-pattern>
   </servlet-mapping>
+ <!-- <filter>
+  <filter-name>FilterUserInput</filter-name>
+  <filter-class>com.ccd.filter.FilterUserInput</filter-class>
+  </filter>
+  <filter-mapping>
+  <filter-name>FilterUserInput</filter-name>
+  <url-pattern>/controllerV2</url-pattern>
+  </filter-mapping>  --> 
 </web-app>
