@@ -30,6 +30,7 @@ public class ControllerServlet_V2 extends HttpServlet {
 	public static HashMap<String, Double> transTable2PL = new HashMap<>();
 	public static HashMap<String, Long> lockTable2PL = new HashMap<>();
 	public static HashMap<String, Double> expressionResultStorage2PL = new HashMap<>();
+	public static LinkedHashMap<String, String> rollbackTable2PL = new LinkedHashMap<>();
 	public static HashMap<Long, Boolean> unlockStart = new HashMap<>();
 
 	// **************** Time-stamp Ordering **************//
@@ -40,20 +41,18 @@ public class ControllerServlet_V2 extends HttpServlet {
 	public static LinkedHashMap<String, Long> operationTimeStamp = new LinkedHashMap<>();
 
 	// ********************* BOCC ***************************//
-	public static HashMap<String, Long> transLifeTime = new HashMap<>();
 	public static HashMap<String, Double> transTableBOCC = new HashMap<>();
 	public static HashMap<String, Double> expressionResultStorageBOCC = new HashMap<>();
 	public static HashMap<String, Double> privateWorkspaceBOCC = new HashMap<>();
-	public static LinkedHashMap<String, String> rollbackTableBOCC = new LinkedHashMap<>();
+	public static LinkedHashMap<Long, String> transactionPhaseBOCC = new LinkedHashMap<>();
+	public static HashMap<String, Long> transLifeTime = new HashMap<>();
 	public static LinkedHashMap<String, Long> readSetBOCC = new LinkedHashMap<>();
 	public static LinkedHashMap<String, Long> writeSetBOCC = new LinkedHashMap<>();
-	public static LinkedHashMap<Long, String> transactionPhaseBOCC = new LinkedHashMap<>();
 
 	// ********************* FOCC ***************************//
 	public static HashMap<String, Double> transTableFOCC = new HashMap<>();
 	public static HashMap<String, Double> expressionResultStorageFOCC = new HashMap<>();
 	public static HashMap<String, Double> privateWorkspaceFOCC = new HashMap<>();
-	public static LinkedHashMap<String, String> rollbackTableFOCC = new LinkedHashMap<>();
 	public static LinkedHashMap<String, Long> readSetFOCC = new LinkedHashMap<>();
 	public static LinkedHashMap<String, Long> writeSetFOCC = new LinkedHashMap<>();
 	public static LinkedHashMap<Long, String> transactionPhaseFOCC = new LinkedHashMap<>();
@@ -63,12 +62,13 @@ public class ControllerServlet_V2 extends HttpServlet {
 
 	long tranID;
 	private int nmbrOfCallsToServlet;
-	private int callNmbrForNullAlgorithm;
 
+	/**
+	 * @see HttpServlet#init
+	 */
 	public void init() {
 		tranID = 1;
 		nmbrOfCallsToServlet = 0;
-		callNmbrForNullAlgorithm = 0;
 	}
 
 	/**
@@ -179,10 +179,11 @@ public class ControllerServlet_V2 extends HttpServlet {
 													// of
 													// the session of the waiting request.
 					nmbrOfCallsToServlet++;
-
-					if (nmbrOfCallsToServlet == 2 && session.getAttribute("t1")
-							.equals("<font color=\"red\">Please select an algorithm!</font>")) {
-						nmbrOfCallsToServlet = 1;
+					if (session.getAttribute("t1") != null) {
+						if (nmbrOfCallsToServlet == 2 && session.getAttribute("t1")
+								.equals("<font color=\"red\">Please select an algorithm!</font>")) {
+							nmbrOfCallsToServlet = 1;
+						}
 					}
 
 					request.setAttribute("counter", nmbrOfCallsToServlet);
@@ -202,12 +203,9 @@ public class ControllerServlet_V2 extends HttpServlet {
 
 	}
 
-	@Override
-	public void destroy() {
-		synchronized (lock) {
-			lock.notifyAll();
-		}
-	}
+	/*
+	 * @Override public void destroy() { synchronized (lock) { lock.notifyAll(); } }
+	 */
 
 	/**
 	 * This method handles the input string (other than "commit" and "wait and retry
@@ -231,10 +229,19 @@ public class ControllerServlet_V2 extends HttpServlet {
 			TwoPhaseLocking_V2 twoPL = new TwoPhaseLocking_V2(tranID);
 			result = twoPL.transactionResult(ts);
 			if (result.size() > 1) {
-				// store values (calculated from expressions) to be used in write operations
-				// later
-				expressionResultStorage2PL.put(result.get(1) + "(" + Long.toString(tranID) + ")",
-						Double.parseDouble(result.get(2)));
+				if (result.get(1).contains("abort")) {
+					cleanLockTable(lockTable2PL, tranID);
+					cleanRollbackTable(rollbackTable2PL, tranID);
+					modifyTempTable(expressionResultStorage2PL, tranID);
+					tranIDList.add(this.tranID);
+					unlockStart.put(this.tranID, false);
+					sessonTranPair.replace(session.getId(), this.tranID++);
+				} else {
+					// store values (calculated from expressions) to be used in write operations
+					// later
+					expressionResultStorage2PL.put(result.get(1) + "(" + Long.toString(tranID) + ")",
+							Double.parseDouble(result.get(2)));
+				}
 			}
 		} else if (algorithm.contains("Timestamp Ordering")) {
 			if (session.getAttribute("timestamp") == null) {
@@ -247,6 +254,8 @@ public class ControllerServlet_V2 extends HttpServlet {
 
 			if (result.size() > 1) {
 				if (result.get(1).contains("abort")) {
+					cleanRollbackTable(rollbackTableTO, tranID);
+					modifyTempTable(expressionResultStorageTO, tranID);
 					session.removeAttribute("timestamp");
 					tranIDList.add(this.tranID);
 					sessonTranPair.replace(session.getId(), this.tranID++);
@@ -262,7 +271,8 @@ public class ControllerServlet_V2 extends HttpServlet {
 			result = bocc.transactionResult(ts);
 
 			if (result.size() > 1) {
-				if (result.get(1).contains("aborted")) { // this handling the scenario where client chooses to abort the
+				if (result.get(1).contains("aborted")) { // this handling the scenario where client chooses to
+															// explicitly abort the
 															// transaction
 					tranIDList.add(this.tranID);
 					sessonTranPair.replace(session.getId(), this.tranID++);
@@ -308,39 +318,15 @@ public class ControllerServlet_V2 extends HttpServlet {
 
 		String commitMessage = null;
 		if (algorithm.contains("Two-Phase Locking")) {
-			// Create a Iterator to KeySet of lock table
-			Iterator<String> keyset = lockTable2PL.keySet().iterator();
-
-			// Iterate over all the lock table keys to remove locks for committed
-			// transaction
-			while (keyset.hasNext()) {
-				String key = keyset.next(); // java.util.ConcurrentModificationException
-				// Check if Value associated with Key is equal to tranID for this commit
-				if (lockTable2PL.get(key) == tranID) {
-					keyset.remove();
-				}
-			}
-
+			cleanLockTable(lockTable2PL, tranID);
+			cleanRollbackTable(rollbackTable2PL, tranID);
 			modifyTempTable(expressionResultStorage2PL, tranID);
 
 			commitMessage = "<font color=\"blue\"> <b>committed transaction #" + Long.toString(tranID)
 					+ " !</b></font> <br/>";
 
 		} else if (algorithm.contains("Timestamp Ordering")) {
-			// Create a Iterator to KeySet of rollback table
-			Iterator<String> keyset = rollbackTableTO.keySet().iterator();
-
-			// Iterate over all the elements to find operations related to committed
-			// transaction
-			// remove them after commit
-			while (keyset.hasNext()) {
-				String key = keyset.next();
-				// Check if key is associated with tranID for this commit,if yes- remove
-				if (key.contains("(" + Long.toString(tranID) + ")")) {
-					keyset.remove();
-				}
-			}
-
+			cleanRollbackTable(rollbackTableTO, tranID);
 			modifyTempTable(expressionResultStorageTO, tranID);
 
 			commitMessage = "<font color=\"blue\"> <b>committed transaction #" + Long.toString(tranID)
@@ -388,7 +374,7 @@ public class ControllerServlet_V2 extends HttpServlet {
 						+ "<br /> Depending upon how you want to handle the conflict, Please enter below options into above text-box: <br/>"
 						+ " - Abort this transaction<br/> - Abort conflicting transaction #" + conflictTranID
 						+ "<br/> - Wait and Retry validation later <br/>";
-			} else if (transactionPhaseFOCC.get(conflictingTranID) == "validated") {
+			} else if (transactionPhaseFOCC.get(tranID) == "validated") {
 				// message for successful validation
 				commitMessage = "<font color=\"blue\"> <b>Validated and Committed Transaction #" + Long.toString(tranID)
 						+ " ! </b></font><br/>";
@@ -432,4 +418,34 @@ public class ControllerServlet_V2 extends HttpServlet {
 		}
 	}
 
+	private void cleanLockTable(HashMap<String, Long> lockTable, Long tranID) {
+		// Create a Iterator to KeySet of lock table
+		Iterator<String> keyset = lockTable.keySet().iterator();
+
+		// Iterate over all the lock table keys to remove locks for committed
+		// transaction
+		while (keyset.hasNext()) {
+			String key = keyset.next(); // java.util.ConcurrentModificationException
+			// Check if Value associated with Key is equal to tranID for this commit
+			if (lockTable.get(key) == tranID) {
+				keyset.remove();
+			}
+		}
+	}
+
+	private void cleanRollbackTable(HashMap<String, String> rollbackTable, Long tranID) {
+		// Create a Iterator to KeySet of rollback table
+		Iterator<String> keyset = rollbackTable.keySet().iterator();
+
+		// Iterate over all the elements to find operations related to committed
+		// transaction
+		// remove them after commit
+		while (keyset.hasNext()) {
+			String key = keyset.next();
+			// Check if key is associated with tranID for this commit,if yes- remove
+			if (key.contains("(" + Long.toString(tranID) + ")")) {
+				keyset.remove();
+			}
+		}
+	}
 }

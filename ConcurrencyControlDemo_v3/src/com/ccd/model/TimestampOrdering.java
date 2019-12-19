@@ -41,22 +41,12 @@ public class TimestampOrdering {
 			ControllerServlet_V2.operationTimeStamp.put(Long.toString(tranID) + "read" + dataElement,
 					System.currentTimeMillis());
 
-			if (ControllerServlet_V2.transTableTO.containsKey(dataElement)) {
-				returnString.add(0,
-						ts + " --> " + dataElement + " = "
-								+ ControllerServlet_V2.transTableTO.get(dataElement).toString() + " --> Time: "
-								+ timeOfOperation());
-
-			} else {
+			if (!ControllerServlet_V2.transTableTO.containsKey(dataElement)) {
 				ControllerServlet_V2.transTableTO.put(dataElement, 0.0);
-				returnString.add(0,
-						ts + " --> " + dataElement + " = "
-								+ ControllerServlet_V2.transTableTO.get(dataElement).toString() + " --> Time: "
-								+ timeOfOperation());
 			}
-
-			// update read-from relation
-			// updateReadFromRelation(dataElement);
+			returnString.add(0,
+					ts + " --> " + dataElement + " = " + ControllerServlet_V2.transTableTO.get(dataElement).toString()
+							+ " --> Time: " + timeOfOperation());
 
 			break;
 		case "expression":
@@ -95,31 +85,42 @@ public class TimestampOrdering {
 			if (ControllerServlet_V2.expressionResultStorageTO
 					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
 
-				newValue = ControllerServlet_V2.expressionResultStorageTO
-						.get(dataElement + "(" + Long.toString(tranID) + ")").toString();
-
 				returnString.add(0, write(ts, dataElement, ControllerServlet_V2.expressionResultStorageTO
 						.get(dataElement + "(" + Long.toString(tranID) + ")")));
 				ControllerServlet_V2.expressionResultStorageTO.remove(dataElement + "(" + Long.toString(tranID) + ")");
+
 			} else {
-				newValue = ControllerServlet_V2.transTableTO.get(dataElement).toString();
 				returnString.add(0, write(ts, dataElement, ControllerServlet_V2.transTableTO.get(dataElement)));
 			}
+
+			newValue = ControllerServlet_V2.transTableTO.get(dataElement).toString();
 
 			// add the before after state of the write operation, so the operations can be
 			// undone when the transaction is aborted
 			ControllerServlet_V2.rollbackTableTO.put(dataElement + "(" + Long.toString(tranID) + ")",
 					oldValue + "|" + newValue);
 
-			// update final-write table
-			// ControllerServlet_V2.finalwriteTableTO.put(dataElement, tranID);
-
 			break;
+
+		case "abort":
+			abort(Long.toString(tranID));
+			returnString.add(0, ts + " --> <font color=\"red\"> <b>ABORTED transaction #" + Long.toString(tranID)
+					+ " !</b></font> <br/>");
+			returnString.add(1, "abort");
+			break;
+
 		}
 
 		return returnString;
 	}
 
+	/**
+	 * 
+	 * @param ts
+	 * @param dataElement
+	 * @param value
+	 * @return
+	 */
 	private String write(String ts, String dataElement, double value) {
 
 		String returnString = null;
@@ -151,14 +152,14 @@ public class TimestampOrdering {
 					if (i != tranID) {
 						String keyToCompare = Long.toString(i) + "write" + dataElement;
 						if (ControllerServlet_V2.operationTimeStamp.containsKey(keyToCompare)) {
-							//if (ControllerServlet_V2.transTimeStamp
-							//		.get(tranID) < ControllerServlet_V2.operationTimeStamp.get(keyToCompare)) {
-								if (ControllerServlet_V2.transTimeStamp
-										.get(tranID) < ControllerServlet_V2.transTimeStamp.get(i)) {
-									shouldAbort = true;
-									break;
-								}
-							//}
+							// if (ControllerServlet_V2.transTimeStamp
+							// .get(tranID) < ControllerServlet_V2.operationTimeStamp.get(keyToCompare)) {
+							if (ControllerServlet_V2.transTimeStamp.get(tranID) < ControllerServlet_V2.transTimeStamp
+									.get(i)) {
+								shouldAbort = true;
+								break;
+							}
+							// }
 						}
 					}
 				}
@@ -168,23 +169,25 @@ public class TimestampOrdering {
 						String readKeyToCompare = Long.toString(i) + "read" + dataElement;
 						String writeKeyToCompare = Long.toString(i) + "write" + dataElement;
 						if (ControllerServlet_V2.operationTimeStamp.containsKey(readKeyToCompare)) {
-							//if (ControllerServlet_V2.transTimeStamp
-							//		.get(tranID) < ControllerServlet_V2.operationTimeStamp.get(readKeyToCompare)) {
-								if (ControllerServlet_V2.transTimeStamp
-										.get(tranID) < ControllerServlet_V2.transTimeStamp.get(i)) {
-									shouldAbort = true;
-									break;
-								}
-							//}
+							// if (ControllerServlet_V2.transTimeStamp
+							// .get(tranID) < ControllerServlet_V2.operationTimeStamp.get(readKeyToCompare))
+							// {
+							if (ControllerServlet_V2.transTimeStamp.get(tranID) < ControllerServlet_V2.transTimeStamp
+									.get(i)) {
+								shouldAbort = true;
+								break;
+							}
+							// }
 						} else if (ControllerServlet_V2.operationTimeStamp.containsKey(writeKeyToCompare)) {
-							//if (ControllerServlet_V2.transTimeStamp
-							//		.get(tranID) < ControllerServlet_V2.operationTimeStamp.get(writeKeyToCompare)) {
-								if (ControllerServlet_V2.transTimeStamp
-										.get(tranID) < ControllerServlet_V2.transTimeStamp.get(i)) {
-									shouldAbort = true;
-									break;
-								}
-							//}
+							// if (ControllerServlet_V2.transTimeStamp
+							// .get(tranID) <
+							// ControllerServlet_V2.operationTimeStamp.get(writeKeyToCompare)) {
+							if (ControllerServlet_V2.transTimeStamp.get(tranID) < ControllerServlet_V2.transTimeStamp
+									.get(i)) {
+								shouldAbort = true;
+								break;
+							}
+							// }
 						}
 					}
 				}

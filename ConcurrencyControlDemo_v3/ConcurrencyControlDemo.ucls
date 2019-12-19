@@ -4,7 +4,7 @@
   <class id="1" language="java" name="com.ccd.controler.ControllerServlet_V2" project="ConcurrencyControlDemo_v3" 
     file="/ConcurrencyControlDemo_v3/src/com/ccd/controler/ControllerServlet_V2.java" binary="false" 
     corner="BOTTOM_RIGHT">    
-    <position height="169" width="261" x="16" y="-80"/>    
+    <position height="169" width="214" x="0" y="-75"/>    
     <display autosize="false" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="false" package="false" protected="false" private="false" static="true"/>      
@@ -13,17 +13,17 @@
   </class>  
   <class id="2" language="java" name="com.ccd.model.TwoPhaseLocking_V2" project="ConcurrencyControlDemo_v3" 
     file="/ConcurrencyControlDemo_v3/src/com/ccd/model/TwoPhaseLocking_V2.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="247" width="281" x="391" y="-314"/>    
+    <position height="123" width="207" x="300" y="-202"/>    
     <display autosize="false" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="true" protected="true" private="true" static="true"/>      
-      <operations public="true" package="true" protected="true" private="true" static="true"/>    
+      <operations public="true" package="false" protected="false" private="false" static="true"/>    
     </display>  
   </class>  
   <class id="3" language="java" name="com.ccd.model.TransactionStmtTransformation" project="ConcurrencyControlDemo_v3" 
     file="/ConcurrencyControlDemo_v3/src/com/ccd/model/TransactionStmtTransformation.java" binary="false" 
     corner="BOTTOM_RIGHT">    
-    <position height="271" width="272" x="801" y="-64"/>    
+    <position height="154" width="236" x="568" y="-118"/>    
     <display autosize="false" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="true" protected="true" private="true" static="true"/>      
@@ -32,39 +32,39 @@
   </class>  
   <class id="4" language="java" name="com.ccd.model.TimestampOrdering" project="ConcurrencyControlDemo_v3" 
     file="/ConcurrencyControlDemo_v3/src/com/ccd/model/TimestampOrdering.java" binary="false" corner="BOTTOM_RIGHT">    
-    <position height="208" width="234" x="421" y="-54"/>    
+    <position height="135" width="206" x="299" y="-67"/>    
     <display autosize="false" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="true" protected="true" private="true" static="true"/>      
-      <operations public="true" package="true" protected="true" private="true" static="true"/>    
+      <operations public="true" package="false" protected="false" private="false" static="true"/>    
     </display>  
   </class>  
   <class id="5" language="java" name="com.ccd.model.OptimisticConcurrencyControlBOCC" 
     project="ConcurrencyControlDemo_v3" 
     file="/ConcurrencyControlDemo_v3/src/com/ccd/model/OptimisticConcurrencyControlBOCC.java" binary="false" 
     corner="BOTTOM_RIGHT">    
-    <position height="210" width="239" x="425" y="160"/>    
+    <position height="138" width="249" x="284" y="77"/>    
     <display autosize="false" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="true" protected="true" private="true" static="true"/>      
-      <operations public="true" package="true" protected="true" private="true" static="true"/>    
+      <operations public="true" package="false" protected="false" private="false" static="true"/>    
     </display>  
   </class>  
   <class id="6" language="java" name="com.ccd.model.OptimisticConcurrencyControlFOCC" 
     project="ConcurrencyControlDemo_v3" 
     file="/ConcurrencyControlDemo_v3/src/com/ccd/model/OptimisticConcurrencyControlFOCC.java" binary="false" 
     corner="BOTTOM_RIGHT">    
-    <position height="192" width="234" x="428" y="393"/>    
+    <position height="136" width="239" x="286" y="229"/>    
     <display autosize="false" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="true" protected="true" private="true" static="true"/>      
-      <operations public="true" package="true" protected="true" private="true" static="true"/>    
+      <operations public="true" package="false" protected="false" private="false" static="true"/>    
     </display>  
   </class>  
   <interface id="7" language="java" name="javax.servlet.http.HttpSession" project="ConcurrencyControlDemo_v3" 
     file="C:/Users/Kumari/Documents/University/Study/Master Thesis/Softwares/apache-tomcat-8.5.45/lib/servlet-api.jar" 
     binary="true" corner="BOTTOM_RIGHT">    
-    <position height="103" width="191" x="50" y="197"/>    
+    <position height="103" width="143" x="35" y="202"/>    
     <display autosize="false" stereotype="true" package="true" initial-value="false" signature="true" 
       sort-features="false" accessors="true" visibility="true">      
       <attributes public="true" package="true" protected="true" private="true" static="true"/>      
@@ -72,81 +72,67 @@
     </display>  
   </interface>  
   <dependency id="8">    
-    <bendpoint x="429" y="234"/>    
-    <bendpoint x="382" y="234"/>    
-    <end type="SOURCE" refId="5"/>    
-    <end type="TARGET" refId="1"/>  
-  </dependency>  
-  <dependency id="9">    
-    <end type="SOURCE" refId="5"/>    
-    <end type="TARGET" refId="3"/>  
-  </dependency>  
-  <dependency id="10">    
-    <bendpoint x="391" y="-190"/>    
-    <bendpoint x="386" y="-184"/>    
-    <bendpoint x="389" y="-188"/>    
-    <end type="SOURCE" refId="1"/>    
-    <end type="TARGET" refId="2"/>  
-  </dependency>  
-  <dependency id="11">    
-    <end type="SOURCE" refId="2"/>    
-    <end type="TARGET" refId="3"/>  
-  </dependency>  
-  <dependency id="12">    
-    <bendpoint x="661" y="409"/>    
-    <bendpoint x="732" y="409"/>    
-    <end type="SOURCE" refId="6"/>    
-    <end type="TARGET" refId="3"/>  
-  </dependency>  
-  <dependency id="13">    
-    <bendpoint x="424" y="481"/>    
-    <bendpoint x="396" y="481"/>    
-    <bendpoint x="199" y="106"/>    
-    <end type="SOURCE" refId="6"/>    
-    <end type="TARGET" refId="1"/>  
-  </dependency>  
-  <dependency id="14">    
     <end type="SOURCE" refId="4"/>    
     <end type="TARGET" refId="3"/>  
   </dependency>  
-  <dependency id="15">    
-    <bendpoint x="277" y="-29"/>    
+  <dependency id="9">    
+    <bendpoint x="214" y="-24"/>    
     <end type="SOURCE" refId="1"/>    
     <end type="TARGET" refId="4"/>  
   </dependency>  
-  <dependency id="16">    
-    <bendpoint x="425" y="409"/>    
+  <dependency id="10">    
+    <bendpoint x="295" y="11"/>    
+    <end type="SOURCE" refId="4"/>    
+    <end type="TARGET" refId="1"/>  
+  </dependency>  
+  <dependency id="11">    
+    <bendpoint x="281" y="128"/>    
+    <end type="SOURCE" refId="5"/>    
+    <end type="TARGET" refId="1"/>  
+  </dependency>  
+  <dependency id="12">    
+    <bendpoint x="238" y="298"/>    
+    <end type="SOURCE" refId="6"/>    
+    <end type="TARGET" refId="1"/>  
+  </dependency>  
+  <dependency id="13">    
+    <bendpoint x="242" y="192"/>    
+    <bendpoint x="274" y="225"/>    
     <end type="SOURCE" refId="1"/>    
     <end type="TARGET" refId="6"/>  
   </dependency>  
-  <dependency id="17">    
+  <dependency id="14">    
     <end type="SOURCE" refId="2"/>    
     <end type="TARGET" refId="1"/>  
   </dependency>  
-  <association id="18">    
+  <dependency id="15">    
+    <bendpoint x="620" y="306"/>    
+    <end type="SOURCE" refId="6"/>    
+    <end type="TARGET" refId="3"/>  
+  </dependency>  
+  <dependency id="16">    
+    <end type="SOURCE" refId="2"/>    
+    <end type="TARGET" refId="3"/>  
+  </dependency>  
+  <association id="17">    
     <end type="SOURCE" refId="1" navigable="false">      
-      <attribute id="19" name="session">        
-        <position height="0" width="0" x="-340" y="519"/>      
+      <attribute id="18" name="session">        
+        <position height="0" width="0" x="-403" y="524"/>      
       </attribute>      
-      <multiplicity id="20" minimum="0" maximum="1">        
-        <position height="0" width="0" x="-340" y="519"/>      
+      <multiplicity id="19" minimum="0" maximum="1">        
+        <position height="0" width="0" x="-403" y="524"/>      
       </multiplicity>    
     </end>    
     <end type="TARGET" refId="7" navigable="true"/>    
     <display labels="true" multiplicity="true"/>  
   </association>  
+  <dependency id="20">    
+    <end type="SOURCE" refId="5"/>    
+    <end type="TARGET" refId="3"/>  
+  </dependency>  
   <dependency id="21">    
     <end type="SOURCE" refId="1"/>    
     <end type="TARGET" refId="5"/>  
-  </dependency>  
-  <dependency id="22">    
-    <bendpoint x="421" y="29"/>    
-    <bendpoint x="401" y="29"/>    
-    <bendpoint x="356" y="29"/>    
-    <bendpoint x="275" y="29"/>    
-    <bendpoint x="284" y="30"/>    
-    <end type="SOURCE" refId="4"/>    
-    <end type="TARGET" refId="1"/>  
   </dependency>  
   <classifier-display autosize="true" stereotype="true" package="true" initial-value="false" signature="true" 
     sort-features="false" accessors="true" visibility="true">    

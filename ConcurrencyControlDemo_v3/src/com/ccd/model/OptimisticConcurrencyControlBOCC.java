@@ -34,17 +34,17 @@ public class OptimisticConcurrencyControlBOCC {
 			// update read set of current transaction
 			ControllerServlet_V2.readSetBOCC.put(dataElement + "(" + Long.toString(tranID) + ")", tranID);
 
+			if (!ControllerServlet_V2.transTableBOCC.containsKey(dataElement)) {
+				ControllerServlet_V2.transTableBOCC.put(dataElement, 0.0);
+			}
+			
 			// read the data
 			if (ControllerServlet_V2.privateWorkspaceBOCC
 					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
 				returnString.add(0, ts + " --> " + dataElement + " = " + ControllerServlet_V2.privateWorkspaceBOCC
 						.get(dataElement + "(" + Long.toString(tranID) + ")").toString());
-			} else if (ControllerServlet_V2.transTableBOCC.containsKey(dataElement)) {
-				returnString.add(0, ts + " --> " + dataElement + " = "
-						+ ControllerServlet_V2.transTableBOCC.get(dataElement).toString());
-
 			} else {
-				ControllerServlet_V2.transTableBOCC.put(dataElement, 0.0);
+				
 				returnString.add(0, ts + " --> " + dataElement + " = "
 						+ ControllerServlet_V2.transTableBOCC.get(dataElement).toString());
 			}

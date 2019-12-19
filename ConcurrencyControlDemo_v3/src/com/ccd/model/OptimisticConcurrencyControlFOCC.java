@@ -47,17 +47,16 @@ public class OptimisticConcurrencyControlFOCC {
 			// update read set of current transaction
 			ControllerServlet_V2.readSetFOCC.put(dataElement + "(" + Long.toString(tranID) + ")", tranID);
 
+			if (!ControllerServlet_V2.transTableFOCC.containsKey(dataElement)) {
+				ControllerServlet_V2.transTableFOCC.put(dataElement, 0.0);
+			}
+			
 			// read the data
 			if (ControllerServlet_V2.privateWorkspaceFOCC
 					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
 				returnString.add(0, ts + " --> " + dataElement + " = " + ControllerServlet_V2.privateWorkspaceFOCC
 						.get(dataElement + "(" + Long.toString(tranID) + ")").toString());
-			} else if (ControllerServlet_V2.transTableFOCC.containsKey(dataElement)) {
-				returnString.add(0, ts + " --> " + dataElement + " = "
-						+ ControllerServlet_V2.transTableFOCC.get(dataElement).toString());
-
 			} else {
-				ControllerServlet_V2.transTableFOCC.put(dataElement, 0.0);
 				returnString.add(0, ts + " --> " + dataElement + " = "
 						+ ControllerServlet_V2.transTableFOCC.get(dataElement).toString());
 			}
