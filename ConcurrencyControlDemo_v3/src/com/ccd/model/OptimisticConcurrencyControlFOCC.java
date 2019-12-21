@@ -17,10 +17,21 @@ public class OptimisticConcurrencyControlFOCC {
 	public ArrayList<String> transactionResult(String ts) throws InterruptedException {
 
 		ArrayList<String> returnString = new ArrayList<String>();
+		
+		if (ControllerServlet_V2.transactionPhaseFOCC.containsKey(tranID)
+				&& ControllerServlet_V2.transactionPhaseFOCC.get(tranID).contains("aborted by transaction #")) {
+
+			returnString.add(0, "<font color=\"red\">This transaction #" + Long.toString(tranID)
+					+ " has been " + ControllerServlet_V2.transactionPhaseFOCC.get(tranID)
+					+ "</font>");
+			returnString.add(1, "aborted");
+			return returnString;
+		}
 
 		TransactionStmtTransformation transactionStmtTransformation = new TransactionStmtTransformation();
 		String operationType = transactionStmtTransformation.operationType(ts);
 		String dataElement = transactionStmtTransformation.dataElement(ts, operationType);
+		
 
 		// find if any other transaction is in val-write phase
 		Iterator<Long> tranIterator = ControllerServlet_V2.transactionPhaseFOCC.keySet().iterator();
@@ -104,7 +115,7 @@ public class OptimisticConcurrencyControlFOCC {
 			returnString.add(1, "aborted");
 			break;
 		case "abort conflicting transaction":
-			abort(ControllerServlet_V2.conflictingTranID, "aborted by transaction#" + Long.toString(tranID));
+			abort(ControllerServlet_V2.conflictingTranID, "aborted by transaction #" + Long.toString(tranID));
 			returnString.add(0,
 					"<br/> ABORTED Conflicting Transaction# " + Long.toString(ControllerServlet_V2.conflictingTranID)
 							+ " ! <br/> Please try to commit this transaction again!");

@@ -32,6 +32,19 @@ public class TimestampOrdering {
 			returnString.add(1, "abort");
 			return returnString;
 		}
+		
+		ControllerServlet_V2.readOnlyTransactionTO.putIfAbsent(tranID, true);
+		if (operationType == "write") {
+			ControllerServlet_V2.readOnlyTransactionTO.replace(tranID, true, false);
+		}
+		
+		abortIfReadingFromAbortedTransaction();
+		if (ControllerServlet_V2.abortedTransactionsTO.containsKey(tranID)) {
+			returnString.add(0, "<font color=\"red\">This transaction #" + Long.toString(tranID)
+			+ " has been " + ControllerServlet_V2.abortedTransactionsTO.get(tranID) + "!</font>");
+			returnString.add(1, "abort");
+			return returnString;
+		}
 
 		switch (operationType) {
 		case "read":
@@ -48,6 +61,11 @@ public class TimestampOrdering {
 					ts + " --> " + dataElement + " = " + ControllerServlet_V2.transTableTO.get(dataElement).toString()
 							+ " --> Time: " + timeOfOperation());
 
+			if (ControllerServlet_V2.finalWriteTO.containsKey(dataElement)) {
+				ControllerServlet_V2.readFromRelationTO.put(dataElement + "(" + Long.toString(tranID) + ")",
+						ControllerServlet_V2.finalWriteTO.get(dataElement));
+			}
+			
 			break;
 		case "expression":
 			ArrayList<String> expressionSolution = transactionStmtTransformation.solveExpression(ts,
@@ -100,6 +118,8 @@ public class TimestampOrdering {
 			ControllerServlet_V2.rollbackTableTO.put(dataElement + "(" + Long.toString(tranID) + ")",
 					oldValue + "|" + newValue);
 
+			ControllerServlet_V2.finalWriteTO.put(dataElement, tranID);
+			
 			break;
 
 		case "abort":
@@ -213,6 +233,30 @@ public class TimestampOrdering {
 				String dataElement = key.replace("(" + tranID + ")", "");
 				ControllerServlet_V2.transTableTO.replace(dataElement, oldVal);
 				// ControllerServlet_V2.transTableTO.replace(dataElement, newVal, oldVal);
+			}
+		}
+		ControllerServlet_V2.abortedTransactionsTO.putIfAbsent(Long.parseLong(tranID), "aborted");
+	}
+	
+	private void abortIfReadingFromAbortedTransaction() {
+		if (ControllerServlet_V2.readOnlyTransactionTO.containsKey(tranID) && ControllerServlet_V2.readOnlyTransactionTO.get(tranID) == false) {
+
+			Iterator<String> readRelationInterator = ControllerServlet_V2.readFromRelationTO.keySet().iterator();
+
+			while (readRelationInterator.hasNext()) {
+				String key = readRelationInterator.next();
+				if (key.contains("(" + tranID + ")")) {
+
+					long readingFromTranID = ControllerServlet_V2.readFromRelationTO.get(key);
+
+					if (ControllerServlet_V2.abortedTransactionsTO.containsKey(readingFromTranID)) {
+						ControllerServlet_V2.abortedTransactionsTO.putIfAbsent(tranID,
+								"aborted because it is reading from an aborted transaction #"
+										+ Long.toString(readingFromTranID));
+						abort(Long.toString(tranID));
+					}
+				}
+				readRelationInterator.remove();
 			}
 		}
 	}

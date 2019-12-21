@@ -32,6 +32,10 @@ public class ControllerServlet_V2 extends HttpServlet {
 	public static HashMap<String, Double> expressionResultStorage2PL = new HashMap<>();
 	public static LinkedHashMap<String, String> rollbackTable2PL = new LinkedHashMap<>();
 	public static HashMap<Long, Boolean> unlockStart = new HashMap<>();
+	public static HashMap<String, Long> readFromRelation2PL = new HashMap<>();
+	public static HashMap<String, Long> finalWrite2PL = new HashMap<>();
+	public static HashMap<Long, String> abortedTransactions2PL = new HashMap<>();
+	public static HashMap<Long, Boolean> readOnlyTransaction2PL = new HashMap<>();
 
 	// **************** Time-stamp Ordering **************//
 	public static HashMap<Long, Long> transTimeStamp = new HashMap<>();
@@ -39,6 +43,10 @@ public class ControllerServlet_V2 extends HttpServlet {
 	public static HashMap<String, Double> expressionResultStorageTO = new HashMap<>();
 	public static LinkedHashMap<String, String> rollbackTableTO = new LinkedHashMap<>();
 	public static LinkedHashMap<String, Long> operationTimeStamp = new LinkedHashMap<>();
+	public static HashMap<String, Long> readFromRelationTO = new HashMap<>();
+	public static HashMap<String, Long> finalWriteTO = new HashMap<>();
+	public static HashMap<Long, String> abortedTransactionsTO = new HashMap<>();
+	public static HashMap<Long, Boolean> readOnlyTransactionTO = new HashMap<>();
 
 	// ********************* BOCC ***************************//
 	public static HashMap<String, Double> transTableBOCC = new HashMap<>();
@@ -105,28 +113,9 @@ public class ControllerServlet_V2 extends HttpServlet {
 
 		if (ts.get(0) != null) {
 
-			// For FOCC algorithm, check if this transaction has been aborted by some other
-			// transaction
-			// if yes, send out the abort msg and stop the transaction
-			if (transactionPhaseFOCC.containsKey(sessonTranPair.get(ts.get(1)))
-					&& transactionPhaseFOCC.get(sessonTranPair.get(ts.get(1))).contains("aborted by transaction#")) {
-
-				result.add(0, "This transaction# " + Long.toString(sessonTranPair.get(ts.get(1))) + " has been "
-						+ ControllerServlet_V2.transactionPhaseFOCC.get(sessonTranPair.get(ts.get(1))));
-
-				nmbrOfCallsToServlet++;
-				request.setAttribute("counter", nmbrOfCallsToServlet);
-				session.setAttribute("t" + Integer.toString(nmbrOfCallsToServlet), result.get(0));
-				tranIDList.add(tranID);
-				unlockStart.put(tranID, false);
-				sessonTranPair.replace(ts.get(1), tranID++);
-				session.setAttribute("tranID", sessonTranPair.get(ts.get(1)));
-
-			}
-
 			// handling 'commit' requests for all the algorithms and 'wait and retry'
 			// request for FOCC algorithm
-			else if (ts.get(0).toLowerCase().contains("commit")
+			if (ts.get(0).toLowerCase().contains("commit")
 
 					|| ts.get(0).toLowerCase().contains("wait and retry")) {
 

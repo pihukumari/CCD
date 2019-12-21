@@ -33,8 +33,22 @@ public class TwoPhaseLocking_V2 {
 		String operationType = transactionStmtTransformation.operationType(ts);
 		String dataElement = transactionStmtTransformation.dataElement(ts, operationType);
 
+		ControllerServlet_V2.readOnlyTransaction2PL.putIfAbsent(tranID, true);
+		if (operationType == "write") {
+			ControllerServlet_V2.readOnlyTransaction2PL.replace(tranID, true, false);
+		}
+
+		abortIfReadingFromAbortedTransaction();
+		if (ControllerServlet_V2.abortedTransactions2PL.containsKey(tranID)) {
+			returnString.add(0, "<font color=\"red\">This transaction #" + Long.toString(tranID) + " has been "
+					+ ControllerServlet_V2.abortedTransactions2PL.get(tranID) + "!</font>");
+			returnString.add(1, "abort");
+			return returnString;
+		}
+
 		switch (operationType) {
 		case "read":
+
 			if (!ControllerServlet_V2.transTable2PL.containsKey(dataElement)) {
 				ControllerServlet_V2.transTable2PL.put(dataElement, 0.0);
 			}
@@ -50,6 +64,11 @@ public class TwoPhaseLocking_V2 {
 					}
 				} else
 					returnString.add(0, ts + "--> Illegal locking! No locks allowed after an unlock.");
+			}
+
+			if (ControllerServlet_V2.finalWrite2PL.containsKey(dataElement)) {
+				ControllerServlet_V2.readFromRelation2PL.put(dataElement + "(" + Long.toString(tranID) + ")",
+						ControllerServlet_V2.finalWrite2PL.get(dataElement));
 			}
 
 			break;
@@ -71,12 +90,17 @@ public class TwoPhaseLocking_V2 {
 			}
 			if (ControllerServlet_V2.expressionResultStorage2PL
 					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
+
 				returnString.add(0, write(ts, dataElement, ControllerServlet_V2.expressionResultStorage2PL
 						.get(dataElement + "(" + Long.toString(tranID) + ")")));
+
 				ControllerServlet_V2.expressionResultStorage2PL.remove(dataElement + "(" + Long.toString(tranID) + ")");
+
 			} else {
 				returnString.add(0, write(ts, dataElement, ControllerServlet_V2.transTable2PL.get(dataElement)));
 			}
+
+			ControllerServlet_V2.finalWrite2PL.put(dataElement, tranID);
 
 			break;
 		case "S_Lock":
@@ -140,7 +164,6 @@ public class TwoPhaseLocking_V2 {
 
 		String oldValue = ""; // initialized to avoid null
 		String newValue = Double.toString(value);
-		;
 
 		// capture old value of data element from transTable
 		if (ControllerServlet_V2.rollbackTable2PL.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
@@ -310,6 +333,32 @@ public class TwoPhaseLocking_V2 {
 				// This statement ensures that if, another transaction wrote the data item, they
 				// will not loose their modifications.
 				// ControllerServlet_V2.transTableTO.replace(dataElement, newVal, oldVal);
+			}
+		}
+
+		ControllerServlet_V2.abortedTransactions2PL.putIfAbsent(tranID, "aborted");
+	}
+
+	private void abortIfReadingFromAbortedTransaction() {
+		if (ControllerServlet_V2.readOnlyTransaction2PL.containsKey(tranID)
+				&& ControllerServlet_V2.readOnlyTransaction2PL.get(tranID) == false) {
+
+			Iterator<String> readRelationInterator = ControllerServlet_V2.readFromRelation2PL.keySet().iterator();
+
+			while (readRelationInterator.hasNext()) {
+				String key = readRelationInterator.next();
+				if (key.contains("(" + tranID + ")")) {
+
+					long readingFromTranID = ControllerServlet_V2.readFromRelation2PL.get(key);
+
+					if (ControllerServlet_V2.abortedTransactions2PL.containsKey(readingFromTranID)) {
+						ControllerServlet_V2.abortedTransactions2PL.putIfAbsent(tranID,
+								"aborted because it is reading from an aborted transaction #"
+										+ Long.toString(readingFromTranID));
+						abort();
+					}
+				}
+				readRelationInterator.remove();
 			}
 		}
 	}
