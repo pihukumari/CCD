@@ -16,7 +16,7 @@ It is a web application that demonstrates the working principle of concurrency c
 - Switch to JavaEE perspective if not already in it. To do this Go to Window -> Perspective -> Open Perspective -> JavaEE
 - Go to Window -> Web Browser -> Select any of the brower you want but not the internal web browser.
 
-#### Getting Started
+## Getting Started
 - In the eclipse, inside the project folder, go to WebContent folder.
 - Right click on the ConcurrencyControDemo_v3.jsp file and choose Run -> Run on Server. A session will open in the browser you chose in the above section.
 - Copy the link and paste it to other browser(s) to start different sessions of the application.
