@@ -24,7 +24,7 @@ public class TransactionStmtTransformation {
 			return "S_Lock";
 		} else if (ts.toLowerCase().contains("l-x(") || ts.toLowerCase().contains("x(")) {
 			return "X_Lock";
-		} else if (ts.toLowerCase().contains("u(")) {
+		} else if (ts.toLowerCase().contains("u(") || ts.toLowerCase().contains("unlock(")) {
 			return "Unlock";
 		} else if (ts.toLowerCase().contains("abort conflicting transaction #")) {
 			return "abort conflicting transaction";
