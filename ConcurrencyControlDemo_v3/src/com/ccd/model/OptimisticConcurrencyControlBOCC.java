@@ -27,24 +27,25 @@ public class OptimisticConcurrencyControlBOCC {
 
 			// update Phase table
 			ControllerServlet_V2.transactionPhaseBOCC.putIfAbsent(tranID, "read phase");
+			
 			// record begin of each transaction (BOT)
 			ControllerServlet_V2.transLifeTime.putIfAbsent("BOT" + "(" + Long.toString(tranID) + ")",
 					System.currentTimeMillis());
+			
+			// add data element to the transTable if it doesn't already exists
+			ControllerServlet_V2.transTableBOCC.putIfAbsent(dataElement, 0.0);
 
 			// update read set of current transaction
 			ControllerServlet_V2.readSetBOCC.put(dataElement + "(" + Long.toString(tranID) + ")", tranID);
 
-			if (!ControllerServlet_V2.transTableBOCC.containsKey(dataElement)) {
-				ControllerServlet_V2.transTableBOCC.put(dataElement, 0.0);
-			}
-			
-			// read the data
+			// read the data from private space if the current transaction already wrote the
+			// data item before
 			if (ControllerServlet_V2.privateWorkspaceBOCC
 					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
 				returnString.add(0, ts + " --> " + dataElement + " = " + ControllerServlet_V2.privateWorkspaceBOCC
 						.get(dataElement + "(" + Long.toString(tranID) + ")").toString());
 			} else {
-				
+				// else read from transTable
 				returnString.add(0, ts + " --> " + dataElement + " = "
 						+ ControllerServlet_V2.transTableBOCC.get(dataElement).toString());
 			}
@@ -54,11 +55,18 @@ public class OptimisticConcurrencyControlBOCC {
 			ArrayList<String> expressionSolution = transactionStmtTransformation.solveExpression(ts,
 					ControllerServlet_V2.transTableBOCC);
 			if (expressionSolution.size() == 1) {
+				// to handle the message about missing data item
 				returnString.add(0, ts + " --> " + expressionSolution.get(0));
+
 			} else if (expressionSolution.size() > 1) {
+				// prepare the output message to servlet
 				returnString.add(0, ts + " --> " + expressionSolution.get(0) + " = " + expressionSolution.get(1));
-				returnString.add(1, expressionSolution.get(0));
-				returnString.add(2, expressionSolution.get(1));
+
+				// store values (calculated from expressions) to be used in write operations
+				// later
+				ControllerServlet_V2.expressionResultStorageBOCC.put(
+						expressionSolution.get(0) + "(" + Long.toString(tranID) + ")",
+						Double.parseDouble(expressionSolution.get(1)));
 			}
 			break;
 		case "write":
@@ -66,10 +74,7 @@ public class OptimisticConcurrencyControlBOCC {
 			// Add the data item to private workspace table if it does not have the data
 			// item for
 			// write operation
-			if (!ControllerServlet_V2.privateWorkspaceBOCC
-					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
-				ControllerServlet_V2.privateWorkspaceBOCC.put(dataElement + "(" + Long.toString(tranID) + ")", 0.0);
-			}
+			ControllerServlet_V2.privateWorkspaceBOCC.putIfAbsent(dataElement + "(" + Long.toString(tranID) + ")", 0.0);
 
 			if (ControllerServlet_V2.expressionResultStorageBOCC
 					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
@@ -104,6 +109,11 @@ public class OptimisticConcurrencyControlBOCC {
 
 	}
 
+	/**
+	 * Validates transaction according to BOCC rules of validation.
+	 * 
+	 * @throws InterruptedException
+	 */
 	public void validateTransaction() throws InterruptedException {
 
 		// find if any other transaction is in val-write phase
@@ -193,7 +203,7 @@ public class OptimisticConcurrencyControlBOCC {
 	/**
 	 * Writes the modifications by a transaction (once it is successfully validated)
 	 * from private workspace to the database, making the values permanent and
-	 * accessible for other transactions
+	 * accessible to other transactions
 	 */
 	private void writeToDB() {
 

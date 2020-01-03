@@ -79,7 +79,7 @@ public class TransactionStmtTransformation {
 		if (!ts.contains("=")) {
 			// if not an expression
 			resultArray.add("Invalid input");
-			
+
 		} else {
 
 			String ts1 = null;
@@ -103,6 +103,8 @@ public class TransactionStmtTransformation {
 			// extract assignment and arithmetic operators
 			String[] operators = ts1.split("[a-zA-Z()]");
 
+			// add the data item for which the expression is - eg.- for x = 5*6 -> store x
+			// here
 			resultArray.add(0, operands[0]);
 
 			// store operators +,-,*,/ from the incoming equation "ts" into ArrayList
@@ -112,19 +114,24 @@ public class TransactionStmtTransformation {
 					operator.add(operators[op].trim());
 				}
 			}
-			// store values for variables, in the incoming equation "ts", in integer form
+			// store values for dataitems, in the incoming equation "ts", in integer form
 			// to perform calculations later
 			for (int i = 1; i < operands.length; i++) {
 				String operand = null;
 				operand = operands[i].trim();
+				// add * operator before brackets if it is missing - eg.- x = 2(5+4) -> make it
+				// x = 2*(5+4)
 				addOperatorAroundBracketsIFMissing(operand, transTable);
 
+				// add operators to the equation arraylist the operators array extracted from
+				// input string ts
 				if (operands.length > 2) {
 					if (i < (operands.length - 1)) {
 						int op = 0;
 						while (operator.size() > 0) {
 							if (operator.get(op).contains("/")) {
 								equation.add(operator.get(op));
+								// remove the operator from the array in each if condition
 								operator.remove(op);
 								operator.trimToSize();
 								break;
@@ -152,24 +159,51 @@ public class TransactionStmtTransformation {
 				}
 			}
 
+			// this handles single value equations like x=5. It adds 5 here
 			if (equation.size() == 1) {
 				resultArray.add(1, equation.get(0).toString());
-				return resultArray;
+				return resultArray; // the method will exit here and output is sent to calling class
+
+			} else if (equation.get(0).contains("Value for the data item ")) {
+				// this is to handle the case when a data item is used in the equation but is
+				// not read by the transaction yet
+				resultArray.clear();
+				resultArray.add(0, equation.get(0).toString());
+				return resultArray; // the method will exit here and output is sent to calling class
 			}
 
-			// ************************************ performing arithmetic operation
-			// according to BODMAS*********************************************/
+//********** performing arithmetic operation according to BODMAS**************/
 
 			// solving bracket
+
+			// set this to false for now
 			boolean isBracketThere = false;
+
+			// this is used to check if there are any brackets in the equation
 			String equationString = equationString(equation);
 
-			while (equationString.contains("(")) {
-				isBracketThere = true;
-				ArrayList<Integer> StartandEndofBracket = findStartandEndofBracket(equation);
-				result = calculationBODMAS(equation, StartandEndofBracket.get(0) + 1, StartandEndofBracket.get(1),
-						isBracketThere, result);
+			// after each execution of this loop, the result of the two adjacent operand is
+			// calculated and stored back into the equation arraylist. That means equation
+			// keeps reducing in size until it reaches size=1, and this one number is the
+			// value of the expression came in 'ts'
 
+			while (equationString.contains("(")) {
+				isBracketThere = true; // set to true
+
+				ArrayList<Integer> StartandEndofBracket = findStartandEndofBracket(equation);
+
+				try {
+					// 'result' contains the solution of the expression inside the bracket
+					result = calculationBODMAS(equation, StartandEndofBracket.get(0) + 1, StartandEndofBracket.get(1),
+							isBracketThere, result);
+				} catch (Exception e) {
+					resultArray.clear();
+					resultArray.add(
+							"Please add arithmatic operators to the equations wherever it is missing! </br> And remove brackets if not necessary for calculations");
+					return resultArray;
+				}
+				// replace the result into the arraylist equation and remove the elements of the
+				// solved bracket.
 				equation.set(StartandEndofBracket.get(0), Double.toString(result));
 				while (equation.get(StartandEndofBracket.get(0) + 1) != ")") {
 					equation.remove(StartandEndofBracket.get(0) + 1);
@@ -178,31 +212,70 @@ public class TransactionStmtTransformation {
 				equation.remove(StartandEndofBracket.get(0) + 1);
 				equation.trimToSize();
 
+				// use the modified equation arraylist to set equationString, so that this while
+				// loop can check and handle more brackets, if any
 				equationString = equationString(equation);
 			}
-			isBracketThere = false;
-			result = calculationBODMAS(equation, 0, (equation.size() - 1), isBracketThere, result);
 
+			// set to false as no more brackets left to solve
+			isBracketThere = false;
+
+			// solve the remaining equation
+			try {
+				result = calculationBODMAS(equation, 0, (equation.size() - 1), isBracketThere, result);
+			} catch (Exception e) {
+				resultArray.clear();
+				resultArray.add(
+						"Please add arithmatic operators to the equations wherever it is missing! </br> And remove brackets if not necessary for calculations");
+				return resultArray;
+			}
+
+			// add the result to the return arraylist
 			resultArray.add(1, Double.toString(result));
 		}
 		return resultArray;
 
 	}
 
+	/**
+	 * Identifies the operands - whether it is a dataitem or a number. If it is data
+	 * item, the check if it is in transTable or not,i.e., it has been read by the
+	 * transaction or not. If not, message about missing data item is sent to the
+	 * calling method.
+	 * 
+	 * @param operand
+	 * @param transTable
+	 * @return
+	 */
 	private boolean expressionHelper(String operand, HashMap<String, Double> transTable) {
 		if (transTable.containsKey(operand)) {
+			// when operand is a data item - fetch its value from transTable and add to
+			// equation array
 			equation.add(Double.toString(transTable.get(operand)));
 		} else if (operand.matches("\\d+")) {
+			// when operand is a number - add directly
 			equation.add(operand);
 		} else {
+			// this is to handle the case when a data item is used in the equation but is
+			// not read by the transaction yet
 			equation.add(0, "Value for the data item " + operand + "  is missing!");
 			return false;
 		}
 		return true;
 	}
 
+	/**
+	 * Perform BODMAS calculation on the equation.
+	 * 
+	 * @param equation
+	 * @param start
+	 * @param end
+	 * @param isBracketThere
+	 * @param result
+	 * @return
+	 */
 	private double calculationBODMAS(ArrayList<String> equation, int start, int end, boolean isBracketThere,
-			double result) {
+			double result) throws Exception {
 
 		// division
 		for (int k = start; k < end; k++) {
@@ -246,6 +319,12 @@ public class TransactionStmtTransformation {
 		return result;
 	}
 
+	/**
+	 * Converts equation arraylist into a string.
+	 * 
+	 * @param equation
+	 * @return
+	 */
 	private String equationString(ArrayList<String> equation) {
 		String equationString = "";
 		for (int i = 0; i < equation.size(); i++) {
@@ -254,6 +333,12 @@ public class TransactionStmtTransformation {
 		return equationString;
 	}
 
+	/**
+	 * Finds the index of '(' and ')' in the equation from 'ts'
+	 * 
+	 * @param equation
+	 * @return Integer Arraylist containing the indices
+	 */
 	private ArrayList<Integer> findStartandEndofBracket(ArrayList<String> equation) {
 		ArrayList<Integer> indicesofBracket = new ArrayList<Integer>();
 		int endOfBracket = 0;
@@ -268,6 +353,15 @@ public class TransactionStmtTransformation {
 		return indicesofBracket;
 	}
 
+	/**
+	 * It is only called by method calcultionBODMAS to handle the multiple
+	 * occurrences of each operations.
+	 * 
+	 * @param index
+	 * @param equation
+	 * @param isBracketThere
+	 * @return
+	 */
 	private int handleMultipleOccuranceOfOperator(int index, ArrayList<String> equation, boolean isBracketThere) {
 		equation.remove(index);
 		equation.remove(index);
@@ -280,46 +374,62 @@ public class TransactionStmtTransformation {
 	}
 
 	/**
+	 * Adds multiplication operator before the brackets if it is missing. It handles
+	 * one element of the operands array at a time. operands array is generated by
+	 * splitting 'ts' with [=+-*\/] as the delimiters.
 	 * 
 	 * @param operand
 	 * @param transTable
 	 */
 	private void addOperatorAroundBracketsIFMissing(String operand, HashMap<String, Double> transTable) {
 
+		// to handle operands' elements like 2(10 that only have open bracket(s)
 		if (operand.contains("(") && !operand.contains(")")) {
+
 			int j = 0;
+			// loop through the length of element
 			while (j < operand.length()) {
 				String opr = "";
 
+				// when bracket encountered (any number of times), add to the equation
 				while (operand.charAt(j) == '(') {
 					equation.add("(");
 					j++;
 				}
+
+				// extract the numbers or data item before or after the bracket
 				while (j < operand.length()) {
 					if (operand.charAt(j) != '(') {
 						opr = opr + operand.charAt(j);
-					} else if (operand.charAt(j) == '(') {
+					} else {
 						break;
 					}
 					j++;
 				}
+
+				// add the extracted number or data item to the equation
 				if (opr != "") {
 					expressionHelper(opr, transTable);
 				}
+
+				// add * to the equation if the loop is not over yet
 				if (j != operand.length()) {
 					equation.add("*");
 				}
 			}
 		} else if (operand.contains(")") && !operand.contains("(")) {
+			// to handle operands' elements like 2)10 - that only have close bracket(s)
+
 			int j = 0;
-			int indexofB = 0;
+			int indexofB = 0; // index of close bracket
+
 			while (j < operand.length()) {
 				String opr = "";
 
 				while (j < operand.length()) {
 					if (operand.charAt(j) != ')') {
 						opr = opr + operand.charAt(j);
-					} else if (operand.charAt(j) == ')') {
+					} else {
 						break;
 					}
 					j++;
@@ -328,6 +438,8 @@ public class TransactionStmtTransformation {
 				if (opr != "") {
 					expressionHelper(opr, transTable);
 				}
+
+				// add close bracket(s) to the equation arraylist.
 				for (int i = indexofB + 1; i < operand.length(); i++) {
 					if (operand.charAt(i) == ')') {
 						equation.add(")");
@@ -335,12 +447,17 @@ public class TransactionStmtTransformation {
 						indexofB = i;
 					}
 				}
+
+				// add * after the ')' to the equation arraylist only if there is a character or
+				// number after ')'
 				if (j < operand.length() - 1) {
 					equation.add("*");
 				}
 				j++;
 			}
 		} else if (operand.contains("(") && operand.contains(")")) {
+			// to handle operands' elements like 2)(100 or (100) or 2(10), etc.
+
 			int j = 0;
 			while (j < operand.length()) {
 				String opr = "";
@@ -358,13 +475,27 @@ public class TransactionStmtTransformation {
 				if (opr != "") {
 					expressionHelper(opr, transTable);
 				}
-				if (j < operand.length() && operand.charAt(j) != ')') {
-					equation.add("*");
+
+				if (j < operand.length()) {
+
+					// add * to the equation if the loop is not over yet
+					if (operand.charAt(j) != ')') {
+						equation.add("*");
+					} else if (operand.charAt(j) == ')') {
+						// add the close bracket
+						equation.add(")");
+					}
+				}
+
+				// add the close bracket to the equation
+				if (j < operand.length() && operand.charAt(j) == '(') {
+					equation.add("(");
 				}
 				j++;
 			}
 
 		} else {
+			// when operands' elements has no brackets
 			expressionHelper(operand, transTable);
 		}
 

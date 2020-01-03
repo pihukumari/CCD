@@ -17,13 +17,12 @@ public class OptimisticConcurrencyControlFOCC {
 	public ArrayList<String> transactionResult(String ts) throws InterruptedException {
 
 		ArrayList<String> returnString = new ArrayList<String>();
-		
+
 		if (ControllerServlet_V2.transactionPhaseFOCC.containsKey(tranID)
 				&& ControllerServlet_V2.transactionPhaseFOCC.get(tranID).contains("aborted by transaction #")) {
 
-			returnString.add(0, "<font color=\"red\">This transaction #" + Long.toString(tranID)
-					+ " has been " + ControllerServlet_V2.transactionPhaseFOCC.get(tranID)
-					+ "</font>");
+			returnString.add(0, "<font color=\"red\">This transaction #" + Long.toString(tranID) + " has been "
+					+ ControllerServlet_V2.transactionPhaseFOCC.get(tranID) + "</font>");
 			returnString.add(1, "aborted");
 			return returnString;
 		}
@@ -31,7 +30,6 @@ public class OptimisticConcurrencyControlFOCC {
 		TransactionStmtTransformation transactionStmtTransformation = new TransactionStmtTransformation();
 		String operationType = transactionStmtTransformation.operationType(ts);
 		String dataElement = transactionStmtTransformation.dataElement(ts, operationType);
-		
 
 		// find if any other transaction is in val-write phase
 		Iterator<Long> tranIterator = ControllerServlet_V2.transactionPhaseFOCC.keySet().iterator();
@@ -58,10 +56,9 @@ public class OptimisticConcurrencyControlFOCC {
 			// update read set of current transaction
 			ControllerServlet_V2.readSetFOCC.put(dataElement + "(" + Long.toString(tranID) + ")", tranID);
 
-			if (!ControllerServlet_V2.transTableFOCC.containsKey(dataElement)) {
-				ControllerServlet_V2.transTableFOCC.put(dataElement, 0.0);
-			}
-			
+			// add data element to the transTable if it doesn't already exists
+			ControllerServlet_V2.transTableFOCC.putIfAbsent(dataElement, 0.0);
+
 			// read the data
 			if (ControllerServlet_V2.privateWorkspaceFOCC
 					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
@@ -76,11 +73,18 @@ public class OptimisticConcurrencyControlFOCC {
 			ArrayList<String> expressionSolution = transactionStmtTransformation.solveExpression(ts,
 					ControllerServlet_V2.transTableFOCC);
 			if (expressionSolution.size() == 1) {
+				// to handle the message about missing data item
 				returnString.add(0, ts + " --> " + expressionSolution.get(0));
+
 			} else if (expressionSolution.size() > 1) {
+				// prepare the output message to servlet
 				returnString.add(0, ts + " --> " + expressionSolution.get(0) + " = " + expressionSolution.get(1));
-				returnString.add(1, expressionSolution.get(0));
-				returnString.add(2, expressionSolution.get(1));
+
+				// store values (calculated from expressions) to be used in write operations
+				// later
+				ControllerServlet_V2.expressionResultStorageFOCC.put(
+						expressionSolution.get(0) + "(" + Long.toString(tranID) + ")",
+						Double.parseDouble(expressionSolution.get(1)));
 			}
 			break;
 		case "write":
@@ -88,10 +92,7 @@ public class OptimisticConcurrencyControlFOCC {
 			// Add the data item to private workspace table if it does not have the data
 			// item for
 			// write operation
-			if (!ControllerServlet_V2.privateWorkspaceFOCC
-					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
-				ControllerServlet_V2.privateWorkspaceFOCC.put(dataElement + "(" + Long.toString(tranID) + ")", 0.0);
-			}
+			ControllerServlet_V2.privateWorkspaceFOCC.putIfAbsent(dataElement + "(" + Long.toString(tranID) + ")", 0.0);
 
 			if (ControllerServlet_V2.expressionResultStorageFOCC
 					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
@@ -245,9 +246,6 @@ public class OptimisticConcurrencyControlFOCC {
 
 				// clear private workspace by removing used data
 				privateWorkspaceIterator.remove();
-				// ControllerServlet_V2.privateWorkspaceFOCC.remove(key);
-				// privateWorkspaceIterator =
-				// ControllerServlet_V2.privateWorkspaceFOCC.keySet().iterator();
 			}
 		}
 
@@ -271,9 +269,6 @@ public class OptimisticConcurrencyControlFOCC {
 			String key = privateWorkspaceIterator.next();
 			if (key.contains("(" + Long.toString(tranID) + ")")) {
 				privateWorkspaceIterator.remove();
-				// ControllerServlet_V2.privateWorkspaceFOCC.remove(key);
-				// privateWorkspaceIterator =
-				// ControllerServlet_V2.privateWorkspaceFOCC.keySet().iterator();
 			}
 		}
 
@@ -286,8 +281,6 @@ public class OptimisticConcurrencyControlFOCC {
 			String rsKey = readSet.next();
 			if (rsKey.contains("(" + Long.toString(tranID) + ")")) {
 				readSet.remove();
-				// ControllerServlet_V2.readSetFOCC.remove(rsKey);
-				// readSet = ControllerServlet_V2.readSetFOCC.keySet().iterator();
 			}
 		}
 		// remove write set for this aborted transaction
@@ -296,8 +289,6 @@ public class OptimisticConcurrencyControlFOCC {
 			String wsKey = writeSet.next();
 			if (wsKey.contains("(" + Long.toString(tranID) + ")")) {
 				writeSet.remove();
-				// ControllerServlet_V2.writeSetFOCC.remove(wsKey);
-				// readSet = ControllerServlet_V2.writeSetFOCC.keySet().iterator();
 			}
 		}
 	}

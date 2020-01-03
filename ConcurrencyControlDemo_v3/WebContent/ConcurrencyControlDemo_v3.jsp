@@ -3,8 +3,20 @@
 <!DOCTYPE html>
 <html>
 <head>
+<title>Concurrency Control Demonstrator</title><head>
 <meta charset="ISO-8859-1">
-<title>Concurrency Control Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+* 
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #f9feff;
+}
+h1 {
+  color: #008080;
+}
+
+</style>
 </head>
 <body>
 <%!
@@ -18,9 +30,9 @@ if (request.getAttribute("counter") != null) {
 }
 
 %>
-
+<h1>Concurrency Control Demonstrator</h1>
 	<b>Select the Concurrency Control Algorithm:</b>
-	<br />
+	<br /><br />
 	<form action="controllerV2" method="post">
 		<select name="algorithm">
 			<option value="Two-Phase Locking">Two-Phase Locking</option>
@@ -30,27 +42,25 @@ if (request.getAttribute("counter") != null) {
 			<!-- <option value="Snapshot Isolation">Snapshot Isolation</option>  -->
 			<option value=<%=session.getAttribute("algo")%> selected disabled
 				style="color: rgb(255, 255, 255);"></option>
-		</select> &nbsp; 
-		<input type="submit" value="Select" /> &nbsp; &nbsp;
+		</select> &nbsp;&nbsp; 
+		
 		<% if (session.getAttribute("algo") != null) { %>
 			<%=session.getAttribute("algo")%> <br />
 		<% } %>
 		<br /> <br />
-	</form>
 		<% if (session.getAttribute("tranID") != null) { %>
-		<i> Current Transaction ID: # <%=session.getAttribute("tranID")%>  </i><br />
+		<i> Current Transaction ID: # <%=session.getAttribute("tranID")%>  </i><br /><br />
 		<% } if (session.getAttribute("timestamp") != null) { %>
 			<i> Start Time: </i> <%=session.getAttribute("timestamp")%> <br/><br />
 		<% } %>
 
 	<b>Enter the transaction steps here:</b>
-	<br />
-	<br />
-	<form action="controllerV2" method="post">
+	<br /><br />
 		<input type="text" name="ts" placeholder="e.g., read(x) or r(x)" /> &nbsp; 
 		<input type="submit" value="execute" /> &nbsp;
 		
 	</form>
+	
 		<% for (int i = 1; i <= counter; i++){ 
 				if (session.getAttribute("t" + Integer.toString(i)) != null) { %>
 						<%=session.getAttribute("t" + Integer.toString(i)) %><br />

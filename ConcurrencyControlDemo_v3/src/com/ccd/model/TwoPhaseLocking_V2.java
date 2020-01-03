@@ -33,105 +33,140 @@ public class TwoPhaseLocking_V2 {
 		String operationType = transactionStmtTransformation.operationType(ts);
 		String dataElement = transactionStmtTransformation.dataElement(ts, operationType);
 
-		ControllerServlet_V2.readOnlyTransaction2PL.putIfAbsent(tranID, true);
-		if (operationType == "write") {
-			ControllerServlet_V2.readOnlyTransaction2PL.replace(tranID, true, false);
+		// check if current transaction has dirty reads. If yes, abort it
+		if (operationType != "abort") {
+			abortIfReadingFromAbortedTransaction();
 		}
-
-		abortIfReadingFromAbortedTransaction();
-		if (ControllerServlet_V2.abortedTransactions2PL.containsKey(tranID)) {
+		// if it is aborted in the above statement, send output message to servlet. Else
+		// continue normal execution
+		if (ControllerServlet_V2.abortedTransactionsList2PL.containsKey(tranID)) {
 			returnString.add(0, "<font color=\"red\">This transaction #" + Long.toString(tranID) + " has been "
-					+ ControllerServlet_V2.abortedTransactions2PL.get(tranID) + "!</font>");
+					+ ControllerServlet_V2.abortedTransactionsList2PL.get(tranID) + "!</font>");
 			returnString.add(1, "abort");
 			return returnString;
 		}
 
+		// add data element to the transTable if it doesn't already exists
+		ControllerServlet_V2.transTable2PL.putIfAbsent(dataElement, 0.0);
+
 		switch (operationType) {
+
+		// handle read operations
 		case "read":
 
-			if (!ControllerServlet_V2.transTable2PL.containsKey(dataElement)) {
-				ControllerServlet_V2.transTable2PL.put(dataElement, 0.0);
-			}
-
 			if (isExclusiveLockbyThisTransaction(dataElement) || isSharedLockbyThisTransaction(dataElement)) {
+				// if transaction already has a S or X lock
 				returnString.add(0, ts + " --> " + dataElement + " = "
 						+ ControllerServlet_V2.transTable2PL.get(dataElement).toString());
 			} else {
+				// else acquire the S lock, but first check if the transaction is still in
+				// growing phase
 				if (!ControllerServlet_V2.unlockStart.get(tranID)) {
+					// if in growing phase, get the lock and read data
 					if (putSLock(dataElement)) {
 						returnString.add(0, ts + " --> Shared lock for 'Read' --> " + dataElement + " = "
 								+ ControllerServlet_V2.transTable2PL.get(dataElement).toString());
 					}
 				} else
+					// else reject the operation with a message
 					returnString.add(0, ts + "--> Illegal locking! No locks allowed after an unlock.");
 			}
 
+			// update readfromRelation table with information about from where this
+			// transaction is reading the data -> from its own write or from write of
+			// another transaction
 			if (ControllerServlet_V2.finalWrite2PL.containsKey(dataElement)) {
 				ControllerServlet_V2.readFromRelation2PL.put(dataElement + "(" + Long.toString(tranID) + ")",
 						ControllerServlet_V2.finalWrite2PL.get(dataElement));
 			}
 
 			break;
+
+		// handle expressions/equations
 		case "expression":
 			ArrayList<String> expressionSolution = transactionStmtTransformation.solveExpression(ts,
 					ControllerServlet_V2.transTable2PL);
+			
 			if (expressionSolution.size() == 1) {
+				// to handle the message about missing data item
 				returnString.add(0, ts + " --> " + expressionSolution.get(0));
+				
 			} else if (expressionSolution.size() > 1) {
+				// prepare the output message to servlet
 				returnString.add(0, ts + " --> " + expressionSolution.get(0) + " = " + expressionSolution.get(1));
-				returnString.add(1, expressionSolution.get(0));
-				returnString.add(2, expressionSolution.get(1));
+				
+				// store values (calculated from expressions) to be used in write operations
+				// later
+				ControllerServlet_V2.expressionResultStorage2PL.put(
+						expressionSolution.get(0) + "(" + Long.toString(tranID) + ")",
+						Double.parseDouble(expressionSolution.get(1)));
 			}
 			break;
+
+		// handle write operations
 		case "write":
 
-			if (!ControllerServlet_V2.transTable2PL.containsKey(dataElement)) {
-				ControllerServlet_V2.transTable2PL.put(dataElement, 0.0);
-			}
+			// check if user has assigned a value to data item using an expression
 			if (ControllerServlet_V2.expressionResultStorage2PL
 					.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
-
+				// if yes, write that value
 				returnString.add(0, write(ts, dataElement, ControllerServlet_V2.expressionResultStorage2PL
 						.get(dataElement + "(" + Long.toString(tranID) + ")")));
 
 				ControllerServlet_V2.expressionResultStorage2PL.remove(dataElement + "(" + Long.toString(tranID) + ")");
 
 			} else {
+				// if not, simply rewrite the value from transTable
 				returnString.add(0, write(ts, dataElement, ControllerServlet_V2.transTable2PL.get(dataElement)));
 			}
 
+			// update finalWrite table with info that which transaction has finally written
+			// the data item
 			ControllerServlet_V2.finalWrite2PL.put(dataElement, tranID);
 
 			break;
+
+		// handle explicit request for shared lock
 		case "S_Lock":
 			if (!ControllerServlet_V2.unlockStart.get(tranID)) {
+				// if in growing phase, grant the lock
 				if (putSLock(dataElement)) {
 					returnString.add(ts + " --> Shared lock aquired on '" + dataElement + "'");
 				}
 			} else
+				// else reject the request
 				returnString.add(0, ts + "--> Illegal locking! No locks allowed after an unlock.");
 			break;
+
+		// handle explicit request for exclusive lock
 		case "X_Lock":
 			if (!ControllerServlet_V2.unlockStart.get(tranID)) {
+				// if in growing phase, grant the lock
 				if (putXLock(dataElement)) {
 					returnString.add(ts + " --> Exclusive lock aquired on '" + dataElement + "'");
 				}
 			} else
+				// else reject the request
 				returnString.add(0, ts + "--> Illegal locking! No locks allowed after an unlock.");
 			break;
+
+		// handle explicit request for unlocking a data item
 		case "Unlock":
-			if (ControllerServlet_V2.lockTable2PL.containsKey("S" + dataElement + Long.toString(tranID))
-					|| ControllerServlet_V2.lockTable2PL.containsKey("X" + dataElement + Long.toString(tranID))) {
-				ControllerServlet_V2.lockTable2PL.remove("S" + dataElement + Long.toString(tranID), tranID);
-				ControllerServlet_V2.lockTable2PL.remove("X" + dataElement + Long.toString(tranID), tranID);
+			if (ControllerServlet_V2.lockTable.containsKey("S" + dataElement + Long.toString(tranID))
+					|| ControllerServlet_V2.lockTable.containsKey("X" + dataElement + Long.toString(tranID))) {
+				ControllerServlet_V2.lockTable.remove("S" + dataElement + Long.toString(tranID), tranID);
+				ControllerServlet_V2.lockTable.remove("X" + dataElement + Long.toString(tranID), tranID);
 				ControllerServlet_V2.unlockStart.put(tranID, true);
 				returnString.add(ts + " --> '" + dataElement + "' is unlocked!");
 			} else {
 				returnString.add(ts + " --> '" + dataElement + "' is not locked.");
 			}
 			break;
+
+		// handle the request to abort the transaction
 		case "abort":
-			abort();
+
+			abort(); // reverts the effects of writes by current transaction
 			returnString.add(0, ts + " --> <font color=\"red\"> <b>ABORTED transaction #" + Long.toString(tranID)
 					+ " !</b></font> <br/>");
 			returnString.add(1, "abort");
@@ -162,16 +197,10 @@ public class TwoPhaseLocking_V2 {
 
 		String returnString = null;
 
-		String oldValue = ""; // initialized to avoid null
-		String newValue = Double.toString(value);
-
-		// capture old value of data element from transTable
-		if (ControllerServlet_V2.rollbackTable2PL.containsKey(dataElement + "(" + Long.toString(tranID) + ")")) {
-			oldValue = ControllerServlet_V2.rollbackTable2PL.get(dataElement + "(" + Long.toString(tranID) + ")")
-					.split("|")[0];
-		} else {
-			oldValue = ControllerServlet_V2.transTable2PL.get(dataElement).toString();
-		}
+		// add the before state of the write operation, so the operations can be
+		// undone when the transaction is aborted
+		ControllerServlet_V2.rollbackTable2PL.putIfAbsent(dataElement + "(" + Long.toString(tranID) + ")",
+				ControllerServlet_V2.transTable2PL.get(dataElement));
 
 		if (isExclusiveLockbyThisTransaction(dataElement)) {
 			ControllerServlet_V2.transTable2PL.replace(dataElement, value);
@@ -187,11 +216,6 @@ public class TwoPhaseLocking_V2 {
 			} else
 				returnString = ts + "--> Illegal locking! No locks allowed after an unlock.";
 		}
-
-		// add the before after state of the write operation, so the operations can be
-		// undone when the transaction is aborted
-		ControllerServlet_V2.rollbackTableTO.put(dataElement + "(" + Long.toString(tranID) + ")",
-				oldValue + "|" + newValue);
 
 		return returnString;
 
@@ -213,7 +237,7 @@ public class TwoPhaseLocking_V2 {
 			while (isExclusiveLockbyOtherTransaction(dataElement)) {
 				ControllerServlet_V2.lock.wait();
 			}
-			ControllerServlet_V2.lockTable2PL.put("S" + dataElement + Long.toString(tranID), tranID);
+			ControllerServlet_V2.lockTable.put("S" + dataElement + Long.toString(tranID), tranID);
 			return true;
 		}
 	}
@@ -237,9 +261,9 @@ public class TwoPhaseLocking_V2 {
 				ControllerServlet_V2.lock.wait();
 			}
 			if (isSharedLockbyThisTransaction(dataElement)) {
-				ControllerServlet_V2.lockTable2PL.remove("S" + dataElement + Long.toString(tranID), tranID);
+				ControllerServlet_V2.lockTable.remove("S" + dataElement + Long.toString(tranID), tranID);
 			}
-			ControllerServlet_V2.lockTable2PL.put("X" + dataElement + Long.toString(tranID), tranID);
+			ControllerServlet_V2.lockTable.put("X" + dataElement + Long.toString(tranID), tranID);
 			return true;
 		}
 	}
@@ -254,8 +278,8 @@ public class TwoPhaseLocking_V2 {
 
 		boolean bool = false;
 		for (long i : ControllerServlet_V2.tranIDList) {
-			if (ControllerServlet_V2.lockTable2PL.containsKey("S" + dataElement + Long.toString(i))
-					&& ControllerServlet_V2.lockTable2PL.get("S" + dataElement + Long.toString(i)) != tranID) {
+			if (ControllerServlet_V2.lockTable.containsKey("S" + dataElement + Long.toString(i))
+					&& ControllerServlet_V2.lockTable.get("S" + dataElement + Long.toString(i)) != tranID) {
 				bool = true;
 				break;
 			} else {
@@ -276,8 +300,8 @@ public class TwoPhaseLocking_V2 {
 
 		boolean bool = false;
 		for (long i : ControllerServlet_V2.tranIDList) {
-			if (ControllerServlet_V2.lockTable2PL.containsKey("X" + dataElement + Long.toString(i))
-					&& ControllerServlet_V2.lockTable2PL.get("X" + dataElement + Long.toString(i)) != tranID) {
+			if (ControllerServlet_V2.lockTable.containsKey("X" + dataElement + Long.toString(i))
+					&& ControllerServlet_V2.lockTable.get("X" + dataElement + Long.toString(i)) != tranID) {
 				bool = true;
 				break;
 			} else {
@@ -295,7 +319,7 @@ public class TwoPhaseLocking_V2 {
 	 */
 	private boolean isExclusiveLockbyThisTransaction(String dataElement) {
 
-		if (ControllerServlet_V2.lockTable2PL.containsKey("X" + dataElement + Long.toString(tranID))) {
+		if (ControllerServlet_V2.lockTable.containsKey("X" + dataElement + Long.toString(tranID))) {
 			return true;
 		} else {
 			return false;
@@ -310,55 +334,79 @@ public class TwoPhaseLocking_V2 {
 	 */
 	private boolean isSharedLockbyThisTransaction(String dataElement) {
 
-		if (ControllerServlet_V2.lockTable2PL.containsKey("S" + dataElement + Long.toString(tranID))) {
+		if (ControllerServlet_V2.lockTable.containsKey("S" + dataElement + Long.toString(tranID))) {
 			return true;
 		} else {
 			return false;
 		}
 	}
 
+	/**
+	 * It is called when abort request is executed. It reverses the effects of
+	 * writes and removes final write set of the aborting transaction. And adds it
+	 * to the list of aborted transactions, so that application can detect dirty
+	 * reads for other transactions and hence can abort them too.
+	 * 
+	 * @param tranID
+	 */
 	private void abort() {
+
 		// ** undo 'write' modifications by current tranID since it is aborted
 		Iterator<String> keySet = ControllerServlet_V2.rollbackTable2PL.keySet().iterator();
 
 		while (keySet.hasNext()) {
 			String key = keySet.next();
+			String dataElement = null;
 			if (key.contains("(" + tranID + ")")) {
 
-				double oldVal = Double.parseDouble(ControllerServlet_V2.rollbackTable2PL.get(key).split("|")[0]);
-				// double newVal =
-				// Double.parseDouble(ControllerServlet_V2.rollbackTableTO.get(key).split("|")[1]);
-				String dataElement = key.replace("(" + tranID + ")", "");
-				ControllerServlet_V2.transTableTO.replace(dataElement, oldVal);
-				// This statement ensures that if, another transaction wrote the data item, they
-				// will not loose their modifications.
-				// ControllerServlet_V2.transTableTO.replace(dataElement, newVal, oldVal);
+				double oldVal = ControllerServlet_V2.rollbackTable2PL.get(key);
+				dataElement = key.replace("(" + tranID + ")", "");
+				ControllerServlet_V2.transTable2PL.replace(dataElement, oldVal);
+			}
+
+			// remove the next entries for the same data item from other transactions that
+			// wrote its value after this aborting transaction. It is to prevent the effects
+			// of cascade abort from reversing to the false value and cause data
+			// inconsistency
+			if (dataElement != null && key.contains(dataElement)) {
+				keySet.remove();
 			}
 		}
 
-		ControllerServlet_V2.abortedTransactions2PL.putIfAbsent(tranID, "aborted");
+		// remove the final write set of the current transaction
+		Iterator<String> finalWritekeySet = ControllerServlet_V2.finalWrite2PL.keySet().iterator();
+
+		while (keySet.hasNext()) {
+			String key = keySet.next();
+			if (ControllerServlet_V2.finalWrite2PL.get(key) == tranID) {
+				finalWritekeySet.remove();
+			}
+		}
+
+		// add the current transaction to aborted list.
+		ControllerServlet_V2.abortedTransactionsList2PL.putIfAbsent(tranID, "aborted");
 	}
 
+	/**
+	 * This method is called to cause cascade abort in case of a dirty read.
+	 */
 	private void abortIfReadingFromAbortedTransaction() {
-		if (ControllerServlet_V2.readOnlyTransaction2PL.containsKey(tranID)
-				&& ControllerServlet_V2.readOnlyTransaction2PL.get(tranID) == false) {
 
-			Iterator<String> readRelationInterator = ControllerServlet_V2.readFromRelation2PL.keySet().iterator();
+		Iterator<String> readRelationInterator = ControllerServlet_V2.readFromRelation2PL.keySet().iterator();
 
-			while (readRelationInterator.hasNext()) {
-				String key = readRelationInterator.next();
-				if (key.contains("(" + tranID + ")")) {
+		while (readRelationInterator.hasNext()) {
+			String key = readRelationInterator.next();
+			if (key.contains("(" + tranID + ")")) {
 
-					long readingFromTranID = ControllerServlet_V2.readFromRelation2PL.get(key);
+				long readingFromTranID = ControllerServlet_V2.readFromRelation2PL.get(key);
 
-					if (ControllerServlet_V2.abortedTransactions2PL.containsKey(readingFromTranID)) {
-						ControllerServlet_V2.abortedTransactions2PL.putIfAbsent(tranID,
-								"aborted because it is reading from an aborted transaction #"
-										+ Long.toString(readingFromTranID));
-						abort();
-					}
+				if (ControllerServlet_V2.abortedTransactionsList2PL.containsKey(readingFromTranID)) {
+					ControllerServlet_V2.abortedTransactionsList2PL.putIfAbsent(tranID,
+							"aborted because it is reading from an aborted transaction #"
+									+ Long.toString(readingFromTranID));
+
+					abort();
 				}
-				readRelationInterator.remove();
 			}
 		}
 	}

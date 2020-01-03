@@ -28,25 +28,23 @@ public class ControllerServlet_V2 extends HttpServlet {
 
 	// *************** 2PL *************************//
 	public static HashMap<String, Double> transTable2PL = new HashMap<>();
-	public static HashMap<String, Long> lockTable2PL = new HashMap<>();
+	public static HashMap<String, Long> lockTable = new HashMap<>();
 	public static HashMap<String, Double> expressionResultStorage2PL = new HashMap<>();
-	public static LinkedHashMap<String, String> rollbackTable2PL = new LinkedHashMap<>();
+	public static LinkedHashMap<String, Double> rollbackTable2PL = new LinkedHashMap<>();
 	public static HashMap<Long, Boolean> unlockStart = new HashMap<>();
-	public static HashMap<String, Long> readFromRelation2PL = new HashMap<>();
 	public static HashMap<String, Long> finalWrite2PL = new HashMap<>();
-	public static HashMap<Long, String> abortedTransactions2PL = new HashMap<>();
-	public static HashMap<Long, Boolean> readOnlyTransaction2PL = new HashMap<>();
+	public static HashMap<String, Long> readFromRelation2PL = new HashMap<>();
+	public static HashMap<Long, String> abortedTransactionsList2PL = new HashMap<>();
 
 	// **************** Time-stamp Ordering **************//
 	public static HashMap<Long, Long> transTimeStamp = new HashMap<>();
 	public static HashMap<String, Double> transTableTO = new HashMap<>();
 	public static HashMap<String, Double> expressionResultStorageTO = new HashMap<>();
-	public static LinkedHashMap<String, String> rollbackTableTO = new LinkedHashMap<>();
+	public static LinkedHashMap<String, Double> rollbackTableTO = new LinkedHashMap<>();
 	public static LinkedHashMap<String, Long> operationTimeStamp = new LinkedHashMap<>();
 	public static HashMap<String, Long> readFromRelationTO = new HashMap<>();
 	public static HashMap<String, Long> finalWriteTO = new HashMap<>();
-	public static HashMap<Long, String> abortedTransactionsTO = new HashMap<>();
-	public static HashMap<Long, Boolean> readOnlyTransactionTO = new HashMap<>();
+	public static HashMap<Long, String> abortedTransactionsListTO = new HashMap<>();
 
 	// ********************* BOCC ***************************//
 	public static HashMap<String, Double> transTableBOCC = new HashMap<>();
@@ -69,6 +67,8 @@ public class ControllerServlet_V2 extends HttpServlet {
 	public static Object lock = new Object();
 
 	long tranID;
+
+	// incremented every time servlet's doPost method is executed
 	private int nmbrOfCallsToServlet;
 
 	/**
@@ -86,31 +86,46 @@ public class ControllerServlet_V2 extends HttpServlet {
 	protected void doPost(HttpServletRequest request, HttpServletResponse response)
 			throws ServletException, IOException {
 
-		request.setAttribute("counter", nmbrOfCallsToServlet);
-
-		RequestDispatcher dispatcher = request.getRequestDispatcher("ConcurrencyControlDemo_v3.jsp");
-		session = request.getSession();
+		// this will collect the result of each operation coming as request
 		ArrayList<String> result = new ArrayList<>();
 
+		// this attribute is used by the jsp for displaying the data. It is set every
+		// time nmbrOfCallsToServlet is incremented
+		request.setAttribute("counter", nmbrOfCallsToServlet);
+
+		// set the dispatcher to the jsp page, so that request can be forwarded to the
+		// jsp with all the session attributes to display
+		RequestDispatcher dispatcher = request.getRequestDispatcher("ConcurrencyControlDemo_v3.jsp");
+
+		// get the session
+		session = request.getSession();
+
+		// extract the algorithm chosen by the user
 		String algorithm = request.getParameter("algorithm");
 
+		// set a transactionID to the current session
 		if (!sessonTranPair.containsKey(session.getId())) {
 			tranIDList.add(tranID);
 			sessonTranPair.put(session.getId(), tranID++);
 		}
 
+		// set some session attributes to handle subsequent requests
 		if (algorithm != null) {
 			session.setAttribute("algo", algorithm);
 			unlockStart.put(sessonTranPair.get(session.getId()), false);
 			session.setAttribute("tranID", sessonTranPair.get(session.getId()));
 		}
-		// extract algorithm name from session attribute "algo"
+
+		// extract algorithm name from session attribute "algo" to be used later to call
+		// the respective class to handle each operation
 		String currentAlgorithm = (String) session.getAttribute("algo");
 
+		// ts will hold the operation sent via request from jsp
 		ArrayList<String> ts = new ArrayList<String>();
 		ts.add(0, request.getParameter("ts"));
 		ts.add(1, session.getId());
 
+		// execute only if an operation is entered by the client
 		if (ts.get(0) != null) {
 
 			// handling 'commit' requests for all the algorithms and 'wait and retry'
@@ -120,6 +135,7 @@ public class ControllerServlet_V2 extends HttpServlet {
 					|| ts.get(0).toLowerCase().contains("wait and retry")) {
 
 				try {
+					// to handle the case where user forgets to choose an algorithm
 					if (currentAlgorithm == null) {
 						result.add(0, "<font color=\"red\">Please select an algorithm!</font>");
 						nmbrOfCallsToServlet = 0;
@@ -127,11 +143,15 @@ public class ControllerServlet_V2 extends HttpServlet {
 						result.add(0, commitTransaction(ts.get(0), currentAlgorithm, sessonTranPair.get(ts.get(1))));
 					}
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+					result.add(0, "Synchronization of session has been Interrupted. Please restat the application");
 				}
 				session = request.getSession(); // has to be called again after the wait() to regain the state of the
 												// session of the waiting request.
 				nmbrOfCallsToServlet++;
+
+				// this if code makes sure not to display the same message of "Please select an
+				// algorithm" more than once. And when user finally realizes and chooses the
+				// algorithm, this message is overwritten with the result of entered operation
 				if (nmbrOfCallsToServlet == 2 && session.getAttribute("t1")
 						.equals("<font color=\"red\">Please select an algorithm!</font>")) {
 					nmbrOfCallsToServlet = 1;
@@ -164,37 +184,49 @@ public class ControllerServlet_V2 extends HttpServlet {
 					} else {
 						result = concurrencyAlgorithm(ts.get(0), currentAlgorithm, sessonTranPair.get(ts.get(1)));
 					}
-					session = request.getSession(); // has to be called again after the wait() to regain the state
-													// of
-													// the session of the waiting request.
-					nmbrOfCallsToServlet++;
-					if (session.getAttribute("t1") != null) {
-						if (nmbrOfCallsToServlet == 2 && session.getAttribute("t1")
-								.equals("<font color=\"red\">Please select an algorithm!</font>")) {
-							nmbrOfCallsToServlet = 1;
-						}
-					}
-
-					request.setAttribute("counter", nmbrOfCallsToServlet);
-					session.setAttribute("t" + Integer.toString(nmbrOfCallsToServlet), result.get(0));
-					session.setAttribute("tranID", sessonTranPair.get(ts.get(1)));
 				} catch (InterruptedException e) {
-					e.printStackTrace();
+					result.add(0, "Synchronization of session has been Interrupted. Please restat the application");
 				}
+				session = request.getSession(); // has to be called again after the wait() to regain the state
+												// of
+												// the session of the waiting request.
+				nmbrOfCallsToServlet++;
+				if (session.getAttribute("t1") != null) {
+					if (nmbrOfCallsToServlet == 2 && session.getAttribute("t1")
+							.equals("<font color=\"red\">Please select an algorithm!</font>")) {
+						nmbrOfCallsToServlet = 1;
+					}
+				}
+
+				request.setAttribute("counter", nmbrOfCallsToServlet);
+				session.setAttribute("t" + Integer.toString(nmbrOfCallsToServlet), result.get(0));
+				session.setAttribute("tranID", sessonTranPair.get(ts.get(1)));
 
 			}
 		}
 
 		synchronized (lock) {
+
+			// forward the request to jsp, which then will display the message outputs set
+			// into session attributes
 			dispatcher.forward(request, response);
+			// notify all the suspended threads, so they can resume
 			lock.notifyAll();
 		}
 
 	}
 
-	/*
-	 * @Override public void destroy() { synchronized (lock) { lock.notifyAll(); } }
+	/**
+	 * Destroy all the saved session attributes saved in the web container.
 	 */
+	@Override
+	public void destroy() {
+		Enumeration<String> attributeNames = session.getAttributeNames();
+		while (attributeNames.hasMoreElements()) {
+			session.removeAttribute(attributeNames.nextElement().toString());
+		}
+		session.invalidate();
+	}
 
 	/**
 	 * This method handles the input string (other than "commit" and "wait and retry
@@ -208,7 +240,7 @@ public class ControllerServlet_V2 extends HttpServlet {
 	 * @return The output message that is displayed to the client.
 	 * @throws InterruptedException
 	 */
-	public ArrayList<String> concurrencyAlgorithm(String ts, String algorithm, long tranID)
+	private ArrayList<String> concurrencyAlgorithm(String ts, String algorithm, long tranID)
 			throws InterruptedException {
 
 		ArrayList<String> result = null;
@@ -219,17 +251,11 @@ public class ControllerServlet_V2 extends HttpServlet {
 			result = twoPL.transactionResult(ts);
 			if (result.size() > 1) {
 				if (result.get(1).contains("abort")) {
-					cleanLockTable(lockTable2PL, tranID);
-					cleanRollbackTable(rollbackTable2PL, tranID);
+					cleanLockTable(lockTable, tranID);
 					modifyTempTable(expressionResultStorage2PL, tranID);
 					tranIDList.add(this.tranID);
 					unlockStart.put(this.tranID, false);
 					sessonTranPair.replace(session.getId(), this.tranID++);
-				} else {
-					// store values (calculated from expressions) to be used in write operations
-					// later
-					expressionResultStorage2PL.put(result.get(1) + "(" + Long.toString(tranID) + ")",
-							Double.parseDouble(result.get(2)));
 				}
 			}
 		} else if (algorithm.contains("Timestamp Ordering")) {
@@ -238,20 +264,16 @@ public class ControllerServlet_V2 extends HttpServlet {
 				transTimeStamp.put(tranID, System.currentTimeMillis()); // time-stamp for the transaction is set here-
 																		// when the first operation is requested
 			}
+
 			TimestampOrdering timeStampOrdering = new TimestampOrdering(tranID);
 			result = timeStampOrdering.transactionResult(ts);
 
 			if (result.size() > 1) {
 				if (result.get(1).contains("abort")) {
-					cleanRollbackTable(rollbackTableTO, tranID);
 					modifyTempTable(expressionResultStorageTO, tranID);
 					session.removeAttribute("timestamp");
 					tranIDList.add(this.tranID);
 					sessonTranPair.replace(session.getId(), this.tranID++);
-				} else {
-					// store temp values to be used in write operations later
-					expressionResultStorageTO.put(result.get(1) + "(" + Long.toString(tranID) + ")",
-							Double.parseDouble(result.get(2)));
 				}
 			}
 
@@ -265,10 +287,6 @@ public class ControllerServlet_V2 extends HttpServlet {
 															// transaction
 					tranIDList.add(this.tranID);
 					sessonTranPair.replace(session.getId(), this.tranID++);
-				} else {
-					// store temp values to be used in write operations later
-					expressionResultStorageBOCC.put(result.get(1) + "(" + Long.toString(tranID) + ")",
-							Double.parseDouble(result.get(2)));
 				}
 			}
 
@@ -280,10 +298,6 @@ public class ControllerServlet_V2 extends HttpServlet {
 				if (result.get(1).contains("aborted")) {
 					tranIDList.add(this.tranID);
 					sessonTranPair.replace(session.getId(), this.tranID++);
-				} else {
-					// store temp values to be used in write operations later
-					expressionResultStorageFOCC.put(result.get(1) + "(" + Long.toString(tranID) + ")",
-							Double.parseDouble(result.get(2)));
 				}
 			}
 
@@ -307,15 +321,13 @@ public class ControllerServlet_V2 extends HttpServlet {
 
 		String commitMessage = null;
 		if (algorithm.contains("Two-Phase Locking")) {
-			cleanLockTable(lockTable2PL, tranID);
-			cleanRollbackTable(rollbackTable2PL, tranID);
+			cleanLockTable(lockTable, tranID);
 			modifyTempTable(expressionResultStorage2PL, tranID);
 
 			commitMessage = "<font color=\"blue\"> <b>committed transaction #" + Long.toString(tranID)
 					+ " !</b></font> <br/>";
 
 		} else if (algorithm.contains("Timestamp Ordering")) {
-			cleanRollbackTable(rollbackTableTO, tranID);
 			modifyTempTable(expressionResultStorageTO, tranID);
 
 			commitMessage = "<font color=\"blue\"> <b>committed transaction #" + Long.toString(tranID)
@@ -422,19 +434,4 @@ public class ControllerServlet_V2 extends HttpServlet {
 		}
 	}
 
-	private void cleanRollbackTable(HashMap<String, String> rollbackTable, Long tranID) {
-		// Create a Iterator to KeySet of rollback table
-		Iterator<String> keyset = rollbackTable.keySet().iterator();
-
-		// Iterate over all the elements to find operations related to committed
-		// transaction
-		// remove them after commit
-		while (keyset.hasNext()) {
-			String key = keyset.next();
-			// Check if key is associated with tranID for this commit,if yes- remove
-			if (key.contains("(" + Long.toString(tranID) + ")")) {
-				keyset.remove();
-			}
-		}
-	}
 }
